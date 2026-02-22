@@ -1245,7 +1245,7 @@ class PlotsMetricas(object):
         if tipo == "sintese":
             lbl = "Síntese"
         else:
-            lbl = "Medianas"
+            lbl = "Amostras"
         # Gráficos
         plt.subplots(figsize=(9, 7))
         plt.scatter(x=dados_x, y=dados_y, s=0.5, color="gray", alpha=0.5, label=lbl)
@@ -1259,7 +1259,6 @@ class PlotsMetricas(object):
         plt.yticks(fontsize='medium')
         plt.xlim(-2, 1)
         plt.ylim(-0.8, 3)
-        plt.legend(loc='lower left', fontsize='medium', markerscale=4, facecolor='white')
         
     def whan_sintese(self, dados):
         self.plot_whan(dados[T.nii_ha.value], dados[T.ha.value], tipo="sintese")
