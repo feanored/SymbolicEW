@@ -36,19 +36,21 @@ RANDOM_SEED = 4321
 CONF_LEVEL = 0.975
 
 class T(Enum):
-    nii = "nii_6584_ew_log10"
-    ha = "halpha_ew_log10"
-    oiii = "oiii_5007_ew_log10"
-    hb = "hbeta_ew_log10"
-    nii_ha = "nii_halpha_log10"
-    oiii_hb = "oiii_hbeta_log10"
+    nii = "nii_6584_ew"
+    ha = "halpha_ew"
+    oiii = "oiii_5007_ew"
+    hb = "hbeta_ew"
+    nii_ha = "nii_halpha_ew"
+    oiii_hb = "oiii_hbeta_ew"
+    nii_ha_f = "nii_halpha_flux"
+    oiii_hb_f = "oiii_hbeta_flux"
 
 class F(Enum):
     atflux = "atflux"
     atmass = "atmass"
     azflux = "aZflux"
     azmass = "aZmass"
-    mass = "mass_log10"
+    mass = "mass"
     av = "Av"
 
 #--------------------------------------------------------------------------------------------------
@@ -107,6 +109,17 @@ class PlotsMetricas(object):
         )
         return X_train, X_conform, X_test, y_train, y_conform, y_test
     
+    # gráficos de correlações multiplas
+    def plot_corr(self, correlacoes, ax, lbls, title):
+        mask = np.triu(np.ones_like(correlacoes, dtype=bool), k=1) # triu debaixo, tril acima
+        sns.heatmap(correlacoes, mask=mask, ax=ax,
+                    annot = True, fmt = '.3f',
+                    square=True, linewidths=0.5,
+                    vmin=0, vmax=1, cmap='coolwarm')
+        ax.set_xticklabels(lbls, rotation=-15)
+        ax.set_yticklabels(lbls, rotation=45)
+        ax.set_title(title)
+
     # Definir treinamento do modelo simbólico
     def operon_regression(self, X_train, y_train, selection='minimum_description_length'):
         # Treinar o modelo
@@ -1241,27 +1254,19 @@ class PlotsMetricas(object):
         plt.text(0.4, 0, "RG")
         plt.text(-0.3, -0.55, "Passive")
     
-    def plot_whan(self, dados_x, dados_y, titulo="Diagrama WHAN", tipo="sintese"):
-        if tipo == "sintese":
-            lbl = "Síntese"
-        else:
-            lbl = "Amostras"
-        # Gráficos
-        plt.subplots(figsize=(9, 7))
-        plt.scatter(x=dados_x, y=dados_y, s=0.5, color="gray", alpha=0.5, label=lbl)
+    def whan_config(self, titulo="Diagrama WHAN", sfx=''):
         self.plot_KeKa06() # linhas de separação teóricas
-        
-        # Configs
         plt.title(titulo, fontsize='x-large')
-        plt.xlabel(r"$log_{10}$(W[NII] / WH$\alpha$)", fontsize='large')
-        plt.ylabel(r"$log_{10}$(WH$\alpha$)", fontsize='large')
+        plt.xlabel(r"$log_{10}$(%s[NII] / %sH$\alpha$)"%(sfx, sfx), fontsize='large')
+        plt.ylabel(r"$log_{10}$EW H$\alpha$)", fontsize='large')
         plt.xticks(fontsize='medium')
         plt.yticks(fontsize='medium')
         plt.xlim(-2, 1)
         plt.ylim(-0.8, 3)
-        
-    def whan_sintese(self, dados):
-        self.plot_whan(dados[T.nii_ha.value], dados[T.ha.value], tipo="sintese")
+        plt.grid(True, alpha=0.2)
+        plt.legend(loc='upper right', fontsize='small')
+        plt.tight_layout()
+        plt.show()
         
     def curvas_densidade(self, dados_x, dados_y, levels=True):
         if levels:
@@ -1272,12 +1277,12 @@ class PlotsMetricas(object):
             lvls = [0.24204035, 0.46083535, 1.138656, 1.85108968] # bpt dados reais
         plt.contour(X, Y, Z, colors='purple', alpha=0.4, levels=lvls)
         #sns.kdeplot(x=dados_x, y=dados_y, cmap=cor, fill=False, levels=(0.1, 0.2, 0.4, 0.6))
-        plt.plot([], [], 'k-', alpha=0.4, linewidth=1, label='Níveis de densidade numérica')
+        plt.plot([], [], '-', color='purple', alpha=0.4, linewidth=1, label='Níveis de densidade numérica')
 
-    def bpt_config(self, title='Diagrama BPT'):
+    def bpt_config(self, title='Diagrama BPT', sfx=''):
         self.plot_KeKa() # Linhas de separação teóricas
-        plt.xlabel(r"$log_{10}$(W[NII] / WH$\alpha$)", fontsize='large')
-        plt.ylabel(r"$log_{10}$(W[OIII] / WH$\beta$)", fontsize='large')
+        plt.xlabel(r"$log_{10}$(%s[NII] / %sH$\alpha$)"%(sfx, sfx), fontsize='large')
+        plt.ylabel(r"$log_{10}$(%s[OIII] / %sH$\beta$)"%(sfx, sfx), fontsize='large')
         plt.title(title)
         plt.xlim(-2, 1)
         plt.ylim(-1.5, 1.4)
@@ -1287,11 +1292,7 @@ class PlotsMetricas(object):
         plt.show()
 
     def bpt_pontos_reg(self, col_x, dados, X_, bptx, bpty, 
-                       complexity=[], titulo="Dados & Operon + Quantílica"):        
-        # Dados de validação da síntese
-        #_, X_sin, _, sintx = self.split_dados(dados, T.nii_ha.value, col_x)
-        #_, _, _, sinty = self.split_dados(dados, T.oiii_hb.value, col_x)
-        
+                       complexity=[], titulo="Dados & Operon + Quantílica"):
         # Todos os dados da síntese
         X_sin = dados[col_x]
         sintx = dados[T.nii_ha.value]
