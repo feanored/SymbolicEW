@@ -18,7 +18,6 @@ from scipy.stats import median_abs_deviation
 from scipy.stats import gaussian_kde
 import statsmodels.api as sm
 from scipy.special import gammaln
-from statsmodels.stats.diagnostic import het_breuschpagan
 from enum import Enum
 from types import SimpleNamespace as Struct
 from pyoperon.sklearn import SymbolicRegressor
@@ -199,9 +198,8 @@ class PlotsMetricas(object):
         #         complexity = model_dict['complexity']
         #         break
         # print("Complexity: %d"%complexity)
-        equation_str = operon.get_model_string(operon.model_, names=[col_x], precision=6)        
-        from sympy import latex
-        eq_latex = latex(equation_str)
+        equation_str = operon.get_model_string(operon.model_, names=[col_x], precision=6)
+        eq_latex = sp.latex(equation_str)
 
         if formato == 'jupyter':
             display(Latex(f'$${eq_latex}$$'))
@@ -679,6 +677,7 @@ class PlotsMetricas(object):
         plt.show()
     
     def calcula_pvalues(self, medians, corte):
+        from statsmodels.stats.diagnostic import het_breuschpagan
         errors_1 = (medians[medians["center"] < corte]["mads"])**2
         X1 = sm.add_constant(medians[medians["center"] < corte]["center"])
         stat_1, pvalue_1, _, _ = het_breuschpagan(1 / (errors_1 + 0.01), X1)
