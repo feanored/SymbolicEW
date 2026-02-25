@@ -1,29 +1,24 @@
 import numpy as np
 import sympy as sp
 import pandas as pd
-import smplotlib # type: ignore
-import seaborn as sns
-from scipy import stats
+from enum import Enum
 from IPython.display import display, Latex
+from types import SimpleNamespace as Struct
+import seaborn as sns
+import smplotlib # type: ignore
 import matplotlib.pyplot as plt
 import plotly.graph_objects as go
 import plotly.express as px
 import plotly.io as pio
+from scipy import stats
+from scipy.special import gammaln
 from scipy.optimize import minimize
-from scipy.stats import linregress, truncnorm
 from sklearn.linear_model import QuantileRegressor
 from sklearn.model_selection import train_test_split
 from sklearn.metrics import mean_squared_error, r2_score
-from scipy.stats import median_abs_deviation
-from scipy.stats import gaussian_kde
-import statsmodels.api as sm
-from scipy.special import gammaln
-from enum import Enum
-from types import SimpleNamespace as Struct
 from pyoperon.sklearn import SymbolicRegressor
 from mapie.metrics.regression import regression_coverage_score
 from mapie.regression import SplitConformalRegressor
-from mapie.regression import ConformalizedQuantileRegressor
 from mapie.utils import train_conformalize_test_split
 import warnings
 warnings.filterwarnings("ignore")
@@ -214,14 +209,7 @@ class PlotsMetricas(object):
             raise ValueError("formato deve ser 'jupyter', 'latex' ou 'texto'")
 
     # Definir treinamento do modelo conformal
-    def conformal_regression_q(self, X_conform, y_conform, regressor, level=CONF_LEVEL):
-        mapie = ConformalizedQuantileRegressor(
-            estimator=regressor, confidence_level=level, prefit=True
-        )
-        mapie.conformalize(X_conform.reshape(-1, 1), y_conform)
-        return mapie
-    
-    def conformal_regression_s(self, X_conform, y_conform, regressor, level=CONF_LEVEL):
+    def conformal_regression(self, X_conform, y_conform, regressor, level=CONF_LEVEL):
         mapie = SplitConformalRegressor(
             estimator=regressor, confidence_level=level, prefit=True
         )
@@ -243,7 +231,7 @@ class PlotsMetricas(object):
             std = 1 / sigma_factor # 4*qtd
             a = (q_inf - media) / std
             b = (q_sup - media) / std
-            amostras = truncnorm.rvs(a, b, loc=media, scale=std, size=qtd)
+            amostras = stats.truncnorm.rvs(a, b, loc=media, scale=std, size=qtd)
             
             for j, amostra in enumerate(amostras):
                 dados.append({'indice': i, 'amostra_id': j, 'amostra': amostra})
@@ -381,7 +369,7 @@ class PlotsMetricas(object):
             if len(bin_indices) > 0:
                 y_values_in_bin = y[bin_indices]
                 medianas[i] = np.median(y_values_in_bin)
-                mads[i] = median_abs_deviation(y_values_in_bin)
+                mads[i] = stats.median_abs_deviation(y_values_in_bin)
             else:
                 medianas[i] = np.nan
                 mads[i] = np.nan
@@ -522,7 +510,7 @@ class PlotsMetricas(object):
     def get_densities(self, x, y):
         # Estimar a densidade 2D
         xy = np.vstack([x, y])
-        kde = gaussian_kde(xy, bw_method=0.3)
+        kde = stats.gaussian_kde(xy, bw_method=0.3)
         
         # Criar grade para contorno
         xgrid = np.linspace(x.min(), x.max()+1, 100)
@@ -676,16 +664,6 @@ class PlotsMetricas(object):
         plt.legend(fontsize='large', loc='lower left')
         plt.show()
     
-    def calcula_pvalues(self, medians, corte):
-        from statsmodels.stats.diagnostic import het_breuschpagan
-        errors_1 = (medians[medians["center"] < corte]["mads"])**2
-        X1 = sm.add_constant(medians[medians["center"] < corte]["center"])
-        stat_1, pvalue_1, _, _ = het_breuschpagan(1 / (errors_1 + 0.01), X1)
-        errors_2 = (medians[medians["center"] >= corte]["mads"])**2
-        X2 = sm.add_constant(medians[medians["center"] >= corte]["center"])
-        stat_2, pvalue_2, _, _ = het_breuschpagan(1 / (errors_2 + 0.01), X2)
-        return pvalue_1, pvalue_2
-        
     def calcula_corte_cedasticidade(self, medians, plot=False, col_x='', col_y=''):
         M = int(np.size(medians["center"]) / 2)-5
         pvalues = np.zeros([2, M-5])
@@ -1108,7 +1086,7 @@ class PlotsMetricas(object):
         plt.show()
         
     def std_linear(self, x, y, col_x, col_y):
-        slope, intercept, r_value, p_value, std_err = linregress(x, y)
+        slope, intercept, r_value, p_value, std_err = stats.linregress(x, y)
         
         # Plot the data and the fit
         plt.scatter(x, y, s=5, label="Desvio por bin", color="blue")
