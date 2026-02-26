@@ -13,6 +13,7 @@ import plotly.io as pio
 from scipy import stats
 from scipy.special import gammaln
 from scipy.optimize import minimize
+from sklearn.preprocessing import StandardScaler
 from sklearn.linear_model import QuantileRegressor
 from sklearn.model_selection import train_test_split
 from sklearn.metrics import mean_squared_error, r2_score
@@ -22,6 +23,11 @@ from mapie.regression import SplitConformalRegressor
 from mapie.utils import train_conformalize_test_split
 import warnings
 warnings.filterwarnings("ignore")
+
+# Modelos de regressão simbólica utilizados
+# https://astroautomata.com/PySR/v1.5.9/api.html
+# pip install pysr==1.5.9
+# pip install pyoperon==0.5.0
 
 #--------------------------------------------------------------------------------------------------
 # Definindo constantes úteis
@@ -104,16 +110,35 @@ class PlotsMetricas(object):
         return X_train, X_conform, X_test, y_train, y_conform, y_test
     
     # gráficos de correlações multiplas
-    def plot_corr(self, correlacoes, ax, lbls, title):
-        mask = np.triu(np.ones_like(correlacoes, dtype=bool), k=1) # triu debaixo, tril acima
+    def plot_corr(self, correlacoes, ax, lbls=None, title=None, type='tot', vmin=0):
+        if type == 'inf': # triu debaixo, tril acima
+            mask = np.triu(np.ones_like(correlacoes, dtype=bool), k=1) 
+        elif type == 'sup':
+            mask = np.tril(np.ones_like(correlacoes, dtype=bool), k=-1)
+        elif type == 'tot':
+            mask = np.zeros_like(correlacoes, dtype=bool)
         sns.heatmap(correlacoes, mask=mask, ax=ax,
                     annot = True, fmt = '.3f',
                     square=True, linewidths=0.5,
-                    vmin=0, vmax=1, cmap='coolwarm')
-        ax.set_xticklabels(lbls, rotation=-15)
-        ax.set_yticklabels(lbls, rotation=45)
-        ax.set_title(title)
+                    vmin=vmin, vmax=1, cmap='coolwarm')
+        if lbls is not None:
+            ax.set_xticklabels(lbls, rotation=-15)
+            ax.set_yticklabels(lbls, rotation=45)
+        else:
+            ax.set_xticklabels(correlacoes.columns, rotation=-15)
+            ax.set_yticklabels(correlacoes.index, rotation=45)
+        if title is not None:
+            ax.set_title(title)
 
+    # Verificar importâncias dos parâmetros nos treinamentos
+    def treinar_modelos(self, dados, larguras):
+        for col in larguras:
+            X_train, X_test, y_train, y_test = self.split_dados(dados, col, self.features)
+            # Mantém todas as correlações entre os parâmetros
+            scaler = StandardScaler()
+            X_train_scaled = scaler.fit_transform(X_train)
+            X_test_scaled = scaler.transform(X_test)
+    
     # Definir treinamento do modelo simbólico
     def operon_regression(self, X_train, y_train, selection='minimum_description_length'):
         # Treinar o modelo
@@ -279,6 +304,30 @@ class PlotsMetricas(object):
         df_diagramas[T.oiii_hb.value] = df_diagramas[T.oiii.value] - df_diagramas[T.hb.value]
         return df_diagramas
 
+    def show_bpt(self, dados, color=None):
+        plt.figure(figsize=(12, 8))
+        if color is None:
+            plt.scatter(dados[T.nii_ha_f.value], dados[T.oiii_hb_f.value], color='#999999', alpha=0.8, s=5, edgecolors='none')
+            self.curvas_densidade(dados[T.nii_ha_f.value], dados[T.oiii_hb_f.value])
+        else:
+            scatter = plt.scatter(dados[T.nii_ha_f.value], dados[T.oiii_hb_f.value], c=dados[color].values, 
+                                alpha=0.8, s=5, cmap='coolwarm', edgecolors='none')
+            cbar = plt.colorbar(scatter)
+            cbar.set_label(color, rotation=90, labelpad=2)
+        self.bpt_config('Diagrama BPT: Dados reais da síntese')
+        
+    def show_whan(self, dados, color=None):
+        plt.figure(figsize=(12, 8))
+        if color is None:
+            plt.scatter(dados[T.nii_ha_f.value] , dados[T.ha.value], color="#999999", alpha=0.8, s=5, edgecolors='none')
+            self.curvas_densidade(dados[T.nii_ha_f.value] , dados[T.ha.value])
+        else:
+            scatter = plt.scatter(dados[T.nii_ha_f.value] , dados[T.ha.value], c=dados[color].values, 
+                                alpha=0.8, s=5, cmap='coolwarm', edgecolors='none')
+            cbar = plt.colorbar(scatter)
+            cbar.set_label(color, rotation=90, labelpad=2)
+        self.whan_config('Diagrama WHAN: Dados reais da síntese')
+    
     # calcula norma R2 no espaço BPT
     def mean_norma_r2(self, x1, y1, x2, y2):
         assert len(x1) == len(x2)
