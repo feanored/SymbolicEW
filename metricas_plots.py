@@ -680,19 +680,19 @@ class PlotsMetricas(object):
         plt.ylabel(y.name)
         plt.show()
     
-    def histogram_v(self, dados, title, ax, density=False,  lim=None, cor=None):
+    def histogram_v(self, dados, title, ax, density=False,  lim=None, cor=None, bins=100):
         ax.set_xlabel('Valor')
         ax.set_ylabel('Contagem')
         if lim is not None: ax.xlim(lim)
-        ax.hist(dados.astype("float"), bins=100, density=density, color=cor)
+        ax.hist(dados.astype("float"), bins=bins, density=density, color=cor)
         ax.set_title(title)
 
-    def histogram_h(self, dados, title, density=False, lim=None, cor=None):
+    def histogram_h(self, dados, title, density=False, lim=None, cor=None, bins=100):
         plt.subplots(figsize=(5*self.phi, 5))
         plt.ylabel('Valor')
         plt.xlabel('Contagem')
         if lim is not None: plt.ylim(lim)
-        plt.hist(dados, bins=100, orientation='horizontal', density=density, color=cor)
+        plt.hist(dados, bins=bins, orientation='horizontal', density=density, color=cor)
         plt.tight_layout()
         plt.title(title)
         plt.show()
