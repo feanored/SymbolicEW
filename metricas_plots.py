@@ -110,7 +110,7 @@ class PlotsMetricas(object):
         return X_train, X_conform, X_test, y_train, y_conform, y_test
     
     # gráficos de correlações multiplas
-    def plot_corr(self, correlacoes, ax, lbls=None, title=None, type='tot', vmin=0):
+    def plot_corr(self, correlacoes, ax, lbls=None, title=None, type='tot', vmin=0, vmax=1):
         if type == 'inf': # triu debaixo, tril acima
             mask = np.triu(np.ones_like(correlacoes, dtype=bool), k=1) 
         elif type == 'sup':
@@ -120,7 +120,7 @@ class PlotsMetricas(object):
         sns.heatmap(correlacoes, mask=mask, ax=ax,
                     annot = True, fmt = '.3f',
                     square=True, linewidths=0.5,
-                    vmin=vmin, vmax=1, cmap='coolwarm')
+                    vmin=vmin, vmax=vmax, cmap='coolwarm')
         if lbls is not None:
             ax.set_xticklabels(lbls, rotation=-15)
             ax.set_yticklabels(lbls, rotation=45)
