@@ -130,6 +130,44 @@ class PlotsMetricas(object):
         if title is not None:
             ax.set_title(title)
 
+    def binned_statistic(self, x, y, nbins=125, tipo='freq'):
+        if tipo == 'freq': # intervalos iguais por frequência
+            quantiles = np.linspace(0, 100, nbins + 1)
+            bins = np.unique(np.percentile(x, quantiles))
+        else: # intervalos iguais por largura
+            bins = np.linspace(x.min(), x.max(), nbins)
+        medias, bin_edges, _ = stats.binned_statistic(x, y, statistic='mean', bins=bins)
+        stds, _, _ = stats.binned_statistic(x, y, statistic='std', bins=bins)
+        bin_centers = (bin_edges[:-1] + bin_edges[1:]) / 2
+        corr_value, _ = stats.spearmanr(bin_centers, medias) # segundo resultado é o p-value
+        return bin_centers, medias, stds, corr_value
+    
+    # Retorna um DataFrame com a correlação de Pearson entre os bins.
+    def calculate_binned_correlations(self, dados, features, larguras, nbins=125):
+        correlations = []
+        for feature in features:
+            row = {}
+            for largura in larguras:
+                x = dados[feature].values
+                y = dados[largura].values
+                bin_centers,medias,_,_ = self.binned_statistic(x, y, nbins)
+                corr_value, _ = stats.spearmanr(bin_centers, medias)
+                row[largura] = corr_value
+            correlations.append(row)
+        corr_binned = pd.DataFrame(correlations, index=features)
+        return corr_binned
+
+    def plot_medias_bins(self, dados, col_x, col_y, nbins=125):
+        centers, medias, stds, corr = self.binned_statistic(dados[col_x], dados[col_y], nbins)
+        plt.scatter(dados[col_x], dados[col_y], alpha=0.5, color='gray', s=2, edgecolors='none')
+        plt.plot(centers, medias, 'k-', linewidth=1.5, label="Média por bin")
+        plt.fill_between(centers, medias - stds, medias + stds, alpha=0.3, color='red', label="Desvio padrão por bin")
+        plt.title(r"Correlação entre bins e médias: $r_s = %.3f$"%corr)
+        plt.xlabel(col_x)
+        plt.ylabel(col_y)
+        plt.legend()
+        plt.show()
+    
     # Verificar importâncias dos parâmetros nos treinamentos
     def treinar_modelos(self, dados, larguras):
         for col in larguras:
