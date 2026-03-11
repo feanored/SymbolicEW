@@ -342,7 +342,7 @@ class PlotsMetricas(object):
         df_diagramas[T.oiii_hb.value] = df_diagramas[T.oiii.value] - df_diagramas[T.hb.value]
         return df_diagramas
 
-    def show_bpt(self, dados, color=None, title="Dados reais da síntese"):
+    def show_bpt(self, dados, color=None, title="Dados reais da síntese", show=True):
         plt.figure(figsize=(10, 7))
         if color is None:
             plt.scatter(dados[T.nii_ha.value], dados[T.oiii_hb.value], color='#999999', alpha=0.8, s=5, edgecolors='none')
@@ -353,8 +353,9 @@ class PlotsMetricas(object):
             cbar = plt.colorbar(scatter)
             cbar.set_label(color, rotation=90, labelpad=2)
         self.bpt_config('Diagrama BPT: %s'%title)
+        if show: plt.show()
         
-    def show_whan(self, dados, color=None, title="Dados reais da síntese"):
+    def show_whan(self, dados, color=None, title="Dados reais da síntese", show=True):
         plt.figure(figsize=(10, 7))
         if color is None:
             plt.scatter(dados[T.nii_ha.value] , dados[T.ha.value], color="#999999", alpha=0.8, s=5, edgecolors='none')
@@ -365,6 +366,7 @@ class PlotsMetricas(object):
             cbar = plt.colorbar(scatter)
             cbar.set_label(color, rotation=90, labelpad=2)
         self.whan_config('Diagrama WHAN: %s'%title)
+        if show: plt.show()
     
     # calcula norma R2 no espaço BPT
     def mean_norma_r2(self, x1, y1, x2, y2):
@@ -1351,7 +1353,6 @@ class PlotsMetricas(object):
         plt.grid(True, alpha=0.2)
         plt.legend(loc='upper right', fontsize='small')
         plt.tight_layout()
-        plt.show()
         
     def curvas_densidade(self, dados_x, dados_y, levels=True):
         if levels:
@@ -1374,7 +1375,6 @@ class PlotsMetricas(object):
         plt.grid(True, alpha=0.2)
         plt.legend(loc='lower left', fontsize='small')
         plt.tight_layout()
-        plt.show()
 
     def bpt_pontos_reg(self, col_x, dados, X_, bptx, bpty, 
                        complexity=[], titulo="Dados & Operon + Quantílica"):
