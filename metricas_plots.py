@@ -342,29 +342,29 @@ class PlotsMetricas(object):
         df_diagramas[T.oiii_hb.value] = df_diagramas[T.oiii.value] - df_diagramas[T.hb.value]
         return df_diagramas
 
-    def show_bpt(self, dados, color=None):
-        plt.figure(figsize=(12, 8))
+    def show_bpt(self, dados, color=None, title="Dados reais da síntese"):
+        plt.figure(figsize=(10, 7))
         if color is None:
-            plt.scatter(dados[T.nii_ha_f.value], dados[T.oiii_hb_f.value], color='#999999', alpha=0.8, s=5, edgecolors='none')
-            self.curvas_densidade(dados[T.nii_ha_f.value], dados[T.oiii_hb_f.value])
+            plt.scatter(dados[T.nii_ha.value], dados[T.oiii_hb.value], color='#999999', alpha=0.8, s=5, edgecolors='none')
+            self.curvas_densidade(dados[T.nii_ha.value], dados[T.oiii_hb.value])
         else:
-            scatter = plt.scatter(dados[T.nii_ha_f.value], dados[T.oiii_hb_f.value], c=dados[color].values, 
+            scatter = plt.scatter(dados[T.nii_ha.value], dados[T.oiii_hb.value], c=dados[color].values, 
                                 alpha=0.8, s=5, cmap='coolwarm', edgecolors='none')
             cbar = plt.colorbar(scatter)
             cbar.set_label(color, rotation=90, labelpad=2)
-        self.bpt_config('Diagrama BPT: Dados reais da síntese')
+        self.bpt_config('Diagrama BPT: %s'%title)
         
-    def show_whan(self, dados, color=None):
-        plt.figure(figsize=(12, 8))
+    def show_whan(self, dados, color=None, title="Dados reais da síntese"):
+        plt.figure(figsize=(10, 7))
         if color is None:
-            plt.scatter(dados[T.nii_ha_f.value] , dados[T.ha.value], color="#999999", alpha=0.8, s=5, edgecolors='none')
-            self.curvas_densidade(dados[T.nii_ha_f.value] , dados[T.ha.value])
+            plt.scatter(dados[T.nii_ha.value] , dados[T.ha.value], color="#999999", alpha=0.8, s=5, edgecolors='none')
+            self.curvas_densidade(dados[T.nii_ha.value] , dados[T.ha.value])
         else:
-            scatter = plt.scatter(dados[T.nii_ha_f.value] , dados[T.ha.value], c=dados[color].values, 
+            scatter = plt.scatter(dados[T.nii_ha.value] , dados[T.ha.value], c=dados[color].values, 
                                 alpha=0.8, s=5, cmap='coolwarm', edgecolors='none')
             cbar = plt.colorbar(scatter)
             cbar.set_label(color, rotation=90, labelpad=2)
-        self.whan_config('Diagrama WHAN: Dados reais da síntese')
+        self.whan_config('Diagrama WHAN: %s'%title)
     
     # calcula norma R2 no espaço BPT
     def mean_norma_r2(self, x1, y1, x2, y2):
@@ -1121,15 +1121,36 @@ class PlotsMetricas(object):
         plt.title("Medianas e regimes de desvios-padrão")
         plt.legend()
         plt.show()
+
+    def salva_equacoes_html(self, modelos, col_x, title):
+        import contextlib
+        from io import StringIO
+        html_path = f"results/equacoes_operon_{title}.html"
+        with open(html_path, "w") as f:
+            f.write("<html><head>\n")
+            f.write("<meta charset='utf-8'>\n")
+            f.write("<style>\n")
+            f.write(".eq { white-space: pre-wrap; overflow-wrap: break-word; }\n")
+            f.write("</style>\n")
+            f.write("</head><body>\n")
+            f.write("<h1>Equações dos modelos Operon para os estimadores da Normal</h1>\n")
+            for nome_modelo, modelo in modelos.items():
+                complexidade = modelo.stats_['model_complexity']
+                r2_score = modelo.stats_['model_r2']
+                f.write(f"<h3>{nome_modelo.upper()}</h3>\n")
+                f.write(f"<p>Complexidade: {complexidade} | R²: {r2_score:.4f}</p>\n")
+                buf = StringIO()
+                with contextlib.redirect_stdout(buf):
+                    self.mostrar_equacao(modelo, col_x)
+                eq_text = buf.getvalue()
+                eq_html = eq_text.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
+                f.write(f"<div class='eq'>{eq_html}</div>\n")
+                f.write("<hr/>\n")
+            f.write("</body></html>\n")
+        print()
+        print("-" * 80)
+        print(f"Escrito em {html_path}")
        
-    def plot_stats(self, dados, col_x, col_y, df_medians):
-        plt.figure(figsize=(8, 8/3*2))
-        plt.plot(df_medians["center"], df_medians["std"], color="red", label="Desvios-padrão")
-        plt.plot(df_medians["center"], df_medians["mad"], color="blue", label="Median-abs-dev")
-        plt.xlabel(col_x, fontsize='x-large'); plt.ylabel(col_y, fontsize='x-large')
-        plt.legend(fontsize='x-large')
-        plt.show()
-    
     # Gráficos de barras das métricas
     def plot_bar(self, forests, knn, operon, linhas, metrica, vmax):
         linhas.reverse()
