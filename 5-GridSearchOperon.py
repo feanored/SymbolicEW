@@ -134,29 +134,51 @@ def random_search(col_x, SEED=4321, popsize=2000, gens=1000):
         mean_vector = means_all[i]
         stds = stds_all[i]    
         cov_matrix = np.diag(stds**2)
+
+        # Preencher covariâncias com validação
         for (l1_nome, l2_nome), cov_vals in covs_all.items():
             i1 = idx_map[l1_nome]
             i2 = idx_map[l2_nome]
-            cov_matrix[i1, i2] = cov_vals[i]
-            cov_matrix[i2, i1] = cov_vals[i]
-        
-        # Regularização robusta
+            if np.isfinite(cov_vals[i]):
+                cov_matrix[i1, i2] = cov_vals[i]
+                cov_matrix[i2, i1] = cov_vals[i]
+
+        # Remover infs e NaNs e garantir simetria
         cov_matrix = np.nan_to_num(cov_matrix, nan=0.0, posinf=0.0, neginf=0.0)
+        cov_matrix = (cov_matrix + cov_matrix.T) / 2
+
+        # Regularização robusta
         corrigiu = False
         try:
+            if not np.all(np.isfinite(cov_matrix)):
+                raise ValueError("Matriz ainda contém valores não-finitos")
+            
+            # Corrigir autovalores negativos ou muito pequenos
+            min_eigenval = 1e-8
             eigenvalues, eigenvectors = np.linalg.eigh(cov_matrix)
-            if np.any(eigenvalues < 1e-8):
-                eigenvalues = np.maximum(eigenvalues, 1e-8)
+            if np.any(eigenvalues < min_eigenval):
+                eigenvalues = np.maximum(eigenvalues, min_eigenval)
                 cov_matrix = eigenvectors @ np.diag(eigenvalues) @ eigenvectors.T
                 corrigiu = True
+            
             sample = multivariate_normal(mean=mean_vector, cov=cov_matrix, allow_singular=True).rvs()
-        except:
+            
+        except Exception as e:
+            print(f"DEBUG: Erro na iteração {i}, usando fallback diagonal.")
+            # Se tudo falhar, usar matriz diagonal
             cov_matrix = np.diag(stds**2)
+            eigenvalues, eigenvectors = np.linalg.eigh(cov_matrix)
+            if not np.all(np.isfinite(cov_matrix)) or np.any(eigenvalues < min_eigenval):
+                print("Abortando combinação problemática, desvios diagonais inválidos!\n")
+                corrigiu = False
+                n_samples -= 1
+                continue # esquece e passa pra próxima combinação
             sample = multivariate_normal(mean=mean_vector, cov=cov_matrix, allow_singular=True).rvs()
             corrigiu = True
+            
         finally:
             if corrigiu: n_correcoes += 1
-        
+
         amostras_multivariadas[i] = sample
 
     amostras = {
@@ -202,7 +224,7 @@ def random_search(col_x, SEED=4321, popsize=2000, gens=1000):
     print(diff_df.round(3))
 
     diff = diff_df.values[np.triu_indices(4, k=1)].sum()
-    print(f"\nDiferença Absoluta Média: {diff:.4f}")
+    print(f"\nDiferença Absoluta: {diff:.4f}")
     print("="*80)
 
     fig, axes = plt.subplots(1, 2, figsize=(16, 6))
@@ -221,7 +243,7 @@ def random_search(col_x, SEED=4321, popsize=2000, gens=1000):
 
 # ### MAIN
 if __name__ == "__main__":
-    for pop in tqdm(range(1000, 5001, 250)):
+    for pop in tqdm(range(1250, 5001, 250)):
         for gen in range(1000, 5001, 250):
             random_search(F.azmass.value, 4321, pop, gen)
             random_search(F.atflux.value, 4321, pop, gen)
