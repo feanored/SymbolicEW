@@ -243,8 +243,8 @@ def random_search(col_x, SEED=4321, popsize=2000, gens=1000):
 
 # ### MAIN
 if __name__ == "__main__":
-    for pop in tqdm(range(1250, 5001, 250)):
-        for gen in range(1000, 5001, 250):
+    for pop in tqdm(range(1000, 5001, 500)):
+        for gen in range(1000, 5001, 500):
             random_search(F.azmass.value, 4321, pop, gen)
             random_search(F.atflux.value, 4321, pop, gen)
             random_search(F.mass.value, 4321, pop, gen)
