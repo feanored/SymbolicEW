@@ -181,7 +181,7 @@ def random_search(col_x, SEED=4321, popsize=1000, gens=1000):
         amostras_multivariadas[i] = sample
 
     amostras = {
-        col_x: X_test,
+        col_x: X_test.values.flatten(),
         larguras[0]: amostras_multivariadas[:, 0],
         larguras[1]: amostras_multivariadas[:, 1],
         larguras[2]: amostras_multivariadas[:, 2],
@@ -238,12 +238,14 @@ def random_search(col_x, SEED=4321, popsize=1000, gens=1000):
 
     # ### Diagramas de diagnóstico coloridos pela feature
 
-    p.show_bpt(amostras, col_x, title="Estimadores Operon + Amostras Normal4D", densities=True)
+    p.show_bpt(df_amostras, col_x, title="Estimadores Operon + Amostras Normal4D", densities=True)
     plt.savefig(f"results/bpt_{col_x}_{popsize}.png")
 
-    p.show_whan(amostras, col_x, title="Estimadores Operon + Amostras Normal4D", densities=True)
+    p.show_whan(df_amostras, col_x, title="Estimadores Operon + Amostras Normal4D", densities=True)
     plt.savefig(f"results/whan_{col_x}_{popsize}.png")
 
+
+## Random search não ajuda selecionar o Operon, pois o modelo já está simplificado e é bom com parâmetros tradicionais. Onde ele vai poder ajudar é na geração das amostras, para ver se gera o conjunto mais parecido com o original em termos do grafico de densidades.
 
 # ### MAIN
 if __name__ == "__main__":
