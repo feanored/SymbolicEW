@@ -59,6 +59,15 @@ class PlotsMetricas(object):
     def __init__(self):
         self.features = [f.value for f in F]
         self.targets = [t.value for t in T]
+        # Covariâncias (matriz triângular, 6 valores)
+        self.cov_pairs = [
+            (self.targets[0], self.targets[1]),
+            (self.targets[0], self.targets[2]),
+            (self.targets[0], self.targets[3]),
+            (self.targets[1], self.targets[2]),
+            (self.targets[1], self.targets[3]),
+            (self.targets[2], self.targets[3])
+        ]
         self.phi = 1.618
         np.random.seed(RANDOM_SEED)
         self.unidades = {}
@@ -142,7 +151,7 @@ class PlotsMetricas(object):
         corr_value, _ = stats.spearmanr(bin_centers, medias) # segundo resultado é o p-value
         return bin_centers, medias, stds, corr_value
     
-    # Retorna um DataFrame com a correlação de Pearson entre os bins.
+    # Retorna um DataFrame com a correlação entre os bins.
     def calculate_binned_correlations(self, dados, features, larguras, nbins=125):
         correlations = []
         for feature in features:
@@ -157,8 +166,9 @@ class PlotsMetricas(object):
         corr_binned = pd.DataFrame(correlations, index=features)
         return corr_binned
 
-    def plot_medias_bins(self, dados, col_x, col_y, nbins=125):
-        centers, medias, stds, corr = self.binned_statistic(dados[col_x], dados[col_y], nbins)
+    def plot_medias_bins(self, dados, col_x, col_y, nbins=125, tipo='freq'):
+        centers, medias, stds, corr = self.binned_statistic(dados[col_x], dados[col_y], nbins, tipo)
+        plt.subplots(figsize=(5*self.phi, 5))
         plt.scatter(dados[col_x], dados[col_y], alpha=0.5, color='gray', s=2, edgecolors='none')
         plt.plot(centers, medias, 'k-', linewidth=1.5, label="Média por bin")
         plt.fill_between(centers, medias - stds, medias + stds, alpha=0.3, color='red', label="Desvio padrão por bin")
@@ -184,9 +194,9 @@ class PlotsMetricas(object):
             random_state=RANDOM_SEED,
             allowed_symbols="add,sub,mul,div,constant,variable,square,pow,abs,sqrt,exp,log,tanh",
             model_selection_criterion=selection,
-            population_size=5000,
-            generations=2000,
-            optimizer_iterations=2000,
+            population_size=2000,
+            generations=1000,
+            optimizer_iterations=500,
             max_length=50,
             n_threads=1, # 12
             objectives= ['r2'] #['mse', 'length']
@@ -271,6 +281,68 @@ class PlotsMetricas(object):
         else:
             raise ValueError("formato deve ser 'jupyter', 'latex' ou 'texto'")
 
+    # Valores do conjunto de validação
+    def inspecao_modelos(self, modelos, dados_bins, col_x):
+        X_bins = dados_bins[col_x].values.reshape(-1, 1)
+        fig, axes = plt.subplots(4, 2, figsize=(12, 14))
+        fig.suptitle('Qualidade dos Modelos Operon para Médias e Desvios-padrão: Predições vs Valores Reais', fontsize=16, y=0.995)
+
+        # Médias
+        for idx, linha in enumerate(self.targets[:4]):
+            ax_mean = axes[idx, 0]
+            y_true_mean = dados_bins[f'{linha}_mean'].values
+            y_pred_mean = modelos[f'{linha}_mean'].predict(X_bins)
+            r2_mean = modelos[f'{linha}_mean'].score(X_bins, y_true_mean)
+            ax_mean.plot([y_true_mean.min(), y_true_mean.max()], 
+                        [y_true_mean.min(), y_true_mean.max()], '--', color='red', alpha=0.5)
+            ax_mean.scatter(y_true_mean, y_pred_mean, alpha=0.75, s=20)
+            ax_mean.set_xlabel('Real')
+            ax_mean.set_ylabel('Predito')
+            ax_mean.set_title(f'MEAN({linha}), $R^2$ = {r2_mean:.4f}')
+            ax_mean.grid(True, alpha=0.3)
+
+        # Desvios-padrão
+        for idx, linha in enumerate(self.targets[:4]):
+            ax_std = axes[idx, 1]
+            y_true_std = dados_bins[f'{linha}_std'].values
+            y_pred_std = modelos[f'{linha}_std'].predict(X_bins)
+            r2_std = modelos[f'{linha}_std'].score(X_bins, y_true_std)
+            ax_std.plot([y_true_std.min(), y_true_std.max()], 
+                        [y_true_std.min(), y_true_std.max()], '--', color='red', alpha=0.5)
+            ax_std.scatter(y_true_std, y_pred_std, alpha=0.75, s=20, color='orange')
+            ax_std.set_xlabel('Real')
+            ax_std.set_ylabel('Predito')
+            ax_std.set_title(f'STD({linha}), $R^2$ = {r2_std:.4f}')
+            ax_std.grid(True, alpha=0.3)
+
+        plt.tight_layout()
+        plt.show()
+    
+    # Inspeção da qualidade dos modelos de covariância
+    def inspecao_modelos_covs(self, modelos, dados_bins, col_x):
+        X_bins = dados_bins[col_x].values.reshape(-1, 1)
+        fig, axes = plt.subplots(3, 2, figsize=(12, 10.5))
+        fig.suptitle('Qualidade dos Modelos Operon para Covariâncias: Predições vs Valores Reais', fontsize=16, y=0.995)
+
+        for idx, (l1, l2) in enumerate(self.cov_pairs):
+            ax = axes[idx // 2, idx % 2]
+            
+            #  Covariâncias
+            y_true_cov = dados_bins[f'cov_{l1}_{l2}'].values
+            y_pred_cov = modelos[f'cov_{l1}_{l2}'].predict(X_bins)
+            r2_cov = modelos[f'cov_{l1}_{l2}'].score(X_bins, y_true_cov)
+            
+            ax.scatter(y_true_cov, y_pred_cov, alpha=0.75, s=20, color='purple')
+            ax.plot([y_true_cov.min(), y_true_cov.max()], 
+                    [y_true_cov.min(), y_true_cov.max()], 'r--', alpha=0.5)
+            ax.set_xlabel('Real')
+            ax.set_ylabel('Predito')
+            ax.set_title(f'COV({l1}, {l2}), $R^2$ = {r2_cov:.4f}')
+            ax.grid(True, alpha=0.3)
+
+        plt.tight_layout()
+        plt.show()
+    
     # Definir treinamento do modelo conformal
     def conformal_regression(self, X_conform, y_conform, regressor, level=CONF_LEVEL):
         mapie = SplitConformalRegressor(
@@ -342,29 +414,31 @@ class PlotsMetricas(object):
         df_diagramas[T.oiii_hb.value] = df_diagramas[T.oiii.value] - df_diagramas[T.hb.value]
         return df_diagramas
 
-    def show_bpt(self, dados, color=None, title="Dados reais da síntese", show=True):
-        plt.figure(figsize=(10, 7))
+    def show_bpt(self, dados, color=None, title="Dados reais da síntese", densities=False, show=True):
         if color is None:
+            plt.figure(figsize=(8.4, 7))
             plt.scatter(dados[T.nii_ha.value], dados[T.oiii_hb.value], color='#999999', alpha=0.8, s=5, edgecolors='none')
-            self.curvas_densidade(dados[T.nii_ha.value], dados[T.oiii_hb.value])
         else:
-            scatter = plt.scatter(dados[T.nii_ha.value], dados[T.oiii_hb.value], c=dados[color].values, 
-                                alpha=0.8, s=5, cmap='coolwarm', edgecolors='none')
+            plt.figure(figsize=(10, 7))
+            scatter = plt.scatter(dados[T.nii_ha.value], dados[T.oiii_hb.value], c=dados[color], 
+                                  alpha=0.8, s=5, cmap='coolwarm', edgecolors='none')
             cbar = plt.colorbar(scatter)
             cbar.set_label(color, rotation=90, labelpad=2)
+        if densities: self.curvas_densidade(dados[T.nii_ha.value], dados[T.oiii_hb.value])
         self.bpt_config('Diagrama BPT: %s'%title)
         if show: plt.show()
         
-    def show_whan(self, dados, color=None, title="Dados reais da síntese", show=True):
-        plt.figure(figsize=(10, 7))
+    def show_whan(self, dados, color=None, title="Dados reais da síntese", densities=False, show=True):
         if color is None:
+            plt.figure(figsize=(8.4, 7))
             plt.scatter(dados[T.nii_ha.value] , dados[T.ha.value], color="#999999", alpha=0.8, s=5, edgecolors='none')
-            self.curvas_densidade(dados[T.nii_ha.value] , dados[T.ha.value])
         else:
-            scatter = plt.scatter(dados[T.nii_ha.value] , dados[T.ha.value], c=dados[color].values, 
-                                alpha=0.8, s=5, cmap='coolwarm', edgecolors='none')
+            plt.figure(figsize=(10, 7))
+            scatter = plt.scatter(dados[T.nii_ha.value] , dados[T.ha.value], c=dados[color], 
+                                  alpha=0.8, s=5, cmap='coolwarm', edgecolors='none')
             cbar = plt.colorbar(scatter)
             cbar.set_label(color, rotation=90, labelpad=2)
+        if densities: self.curvas_densidade(dados[T.nii_ha.value] , dados[T.ha.value])
         self.whan_config('Diagrama WHAN: %s'%title)
         if show: plt.show()
     

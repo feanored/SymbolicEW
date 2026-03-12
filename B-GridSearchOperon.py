@@ -4,7 +4,7 @@ import pandas as pd
 from tqdm import tqdm
 import matplotlib.pyplot as plt
 from sklearn.model_selection import train_test_split
-from scipy.stats import multivariate_normal
+from scipy.stats import multivariate_normal, spearmanr
 from metricas_plots import PlotsMetricas, T, F
 
 # Variáveis globais
@@ -52,7 +52,7 @@ def gera_stats(dados_split, col_x):
         stats_list.append(stat_dict)
     return stats_list
 
-def random_search(col_x, SEED=4321, popsize=2000, gens=1000):
+def random_search(col_x, SEED=4321, popsize=1000, gens=1000):
     # Faz o split e o agrupamento dos dados
     train, test = train_test_split(dados[[col_x] + larguras], test_size=0.3, random_state=4321)
     
@@ -106,10 +106,10 @@ def random_search(col_x, SEED=4321, popsize=2000, gens=1000):
         modelo = p.treinar_operon(hyper, X_train_bins, y)
         modelos[f'cov_{l1}_{l2}'] = modelo
 
-    p.salva_equacoes_html(modelos, col_x, f"n4d_{col_x}_{SEED}_{popsize}_{gens}")
+    #p.salva_equacoes_html(modelos, col_x, f"n4d_{col_x}_{SEED}_{popsize}")
 
     # ## Gerar Amostras do Conjunto de Teste com Normal Multivariada
-    #X_test_bins = test_por_bin[col_x].values.reshape(-1, 1)
+    #X_test_bins = test_por_bin[col_x].values.reshape(-1, 1).astype(np.float64)
     X_test = test[[col_x]].astype(np.float64)
     n_samples = len(X_test)
 
@@ -164,7 +164,6 @@ def random_search(col_x, SEED=4321, popsize=2000, gens=1000):
             sample = multivariate_normal(mean=mean_vector, cov=cov_matrix, allow_singular=True).rvs()
             
         except Exception as e:
-            print(f"DEBUG: Erro na iteração {i}, usando fallback diagonal.")
             # Se tudo falhar, usar matriz diagonal
             cov_matrix = np.diag(stds**2)
             eigenvalues, eigenvectors = np.linalg.eigh(cov_matrix)
@@ -173,7 +172,7 @@ def random_search(col_x, SEED=4321, popsize=2000, gens=1000):
                 corrigiu = False
                 n_samples -= 1
                 continue # esquece e passa pra próxima combinação
-            sample = multivariate_normal(mean=mean_vector, cov=cov_matrix, allow_singular=True).rvs()
+            sample = multivariate_normal(mean=mean_vector, cov=cov_matrix, allow_singular=False).rvs()
             corrigiu = True
             
         finally:
@@ -192,59 +191,61 @@ def random_search(col_x, SEED=4321, popsize=2000, gens=1000):
     print("\nAmostragem multivariada concluída!")
     print(f"   - Amostras: {n_samples}")
     print(f"   - Matrizes corrigidas: {n_correcoes} ({100*n_correcoes/n_samples:.1f}%)\n")
+    df_amostras = pd.DataFrame(amostras)
+    df_amostras.to_csv(f"results/amostras_{col_x}_{popsize}.csv", index=False)
 
-    print(f"Estatísticas para SEED {SEED}:\n")
+    print(f"Estatísticas:\n")
     for nome in larguras:
-        valores = amostras[nome]
+        valores = df_amostras[nome]
         print(f"  {nome:12s}: média={valores.mean():7.3f}, std={valores.std():6.3f}, "
             f"min={valores.min():7.3f}, max={valores.max():7.3f}")
 
+    df_amostras = df_amostras.dropna()
+    df_amostras = df_amostras.reset_index(drop=True)
+    
     # ## Calcular razões do BPT
     test[T.nii_ha.value] = test[T.nii.value].values - test[T.ha.value].values
     test[T.oiii_hb.value] = test[T.oiii.value].values - test[T.hb.value].values
-    amostras[T.nii_ha.value] = amostras[T.nii.value] - amostras[T.ha.value]
-    amostras[T.oiii_hb.value] = amostras[T.oiii.value] - amostras[T.hb.value]
+    df_amostras[T.nii_ha.value] = df_amostras[T.nii.value] - df_amostras[T.ha.value]
+    df_amostras[T.oiii_hb.value] = df_amostras[T.oiii.value] - df_amostras[T.hb.value]
 
     # Verificar se as correlações foram preservadas
     print("\nVERIFICAÇÃO: Correlações das amostras geradas")
     print("="*80)
 
     # Matriz de correlação das amostras geradas
-    amostras_array = np.column_stack([amostras[nome] for nome in larguras])
-    corr_gerada = np.corrcoef(amostras_array, rowvar=False)
-    df_amostras = pd.DataFrame(corr_gerada, index=larguras, columns=larguras)
+    corr_gerada = spearmanr(df_amostras[larguras]).correlation
+    df_corrger = pd.DataFrame(corr_gerada, index=larguras, columns=larguras)
 
     # Matriz de correlação dos dados reais (test set)
     test_linhas = test[larguras].values
-    corr_real = np.corrcoef(test_linhas, rowvar=False)
-    df_test = pd.DataFrame(corr_real, index=larguras, columns=larguras)
+    corr_real = spearmanr(test_linhas).correlation
+    df_corrtest = pd.DataFrame(corr_real, index=larguras, columns=larguras)
+
+    # Diferença total absoluta
+    diff_df = (df_corrger - df_corrtest).abs()
+    diff = diff_df.values[np.triu_indices(4, k=1)].sum()
 
     print("\nDiferença Absoluta - (Amostras - Teste):")
-    diff_df = (df_amostras - df_test).abs()
     print(diff_df.round(3))
-
-    diff = diff_df.values[np.triu_indices(4, k=1)].sum()
     print(f"\nDiferença Absoluta: {diff:.4f}")
     print("="*80)
 
     fig, axes = plt.subplots(1, 2, figsize=(16, 6))
     p.plot_corr(corr_real, axes[0], larguras, title='Matriz de correlação dos dados de teste', type='inf')
     p.plot_corr(corr_gerada, axes[1], larguras, title=r'Matriz de correlação das amostras normais, $\Delta$=%.4f'%diff, type='inf')
-    fig.savefig(f"results/corr_{col_x}_{SEED}_{popsize}_{gens}.png")
+    fig.savefig(f"results/corr_{col_x}_{popsize}.png")
 
     # ### Diagramas de diagnóstico coloridos pela feature
 
-    p.show_bpt(amostras, col_x, title="Estimadores Operon + Amostras Normal4D")
-    plt.savefig(f"results/bpt_{col_x}_{SEED}_{popsize}_{gens}.png")
+    p.show_bpt(amostras, col_x, title="Estimadores Operon + Amostras Normal4D", densities=True)
+    plt.savefig(f"results/bpt_{col_x}_{popsize}.png")
 
-    p.show_whan(amostras, col_x, title="Estimadores Operon + Amostras Normal4D")
-    plt.savefig(f"results/whan_{col_x}_{SEED}_{popsize}_{gens}.png")
+    p.show_whan(amostras, col_x, title="Estimadores Operon + Amostras Normal4D", densities=True)
+    plt.savefig(f"results/whan_{col_x}_{popsize}.png")
 
 
 # ### MAIN
 if __name__ == "__main__":
-    for pop in tqdm(range(1000, 5001, 500)):
-        for gen in range(1000, 5001, 500):
-            random_search(F.azmass.value, 4321, pop, gen)
-            random_search(F.atflux.value, 4321, pop, gen)
-            random_search(F.mass.value, 4321, pop, gen)
+    for pop in tqdm(range(500, 5001, 500)):
+        random_search(F.azmass.value, 4321, pop, 1000)
