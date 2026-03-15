@@ -4,6 +4,7 @@ import pandas as pd
 from tqdm import tqdm
 import matplotlib.pyplot as plt
 from sklearn.model_selection import train_test_split
+from sklearn.metrics import r2_score, mean_squared_error
 from scipy.stats import multivariate_normal, spearmanr
 from metricas_plots import PlotsMetricas, T, F
 
@@ -11,6 +12,7 @@ from metricas_plots import PlotsMetricas, T, F
 p = PlotsMetricas()
 larguras = p.targets[:4]
 dados = pd.read_csv("dados/ariel_limpo_log10.csv.gz", compression="gzip")
+modelos = {} # Dicionário para armazenar os modelos treinados
 
 # Covariâncias (matriz triângular)
 cov_pairs = [
@@ -52,7 +54,7 @@ def gera_stats(dados_split, col_x):
         stats_list.append(stat_dict)
     return stats_list
 
-def random_search(col_x, SEED=4321, popsize=1000, gens=1000):
+def grid_search(col_x, SEED=4321, popsize=1000, gens=1000):
     # Faz o split e o agrupamento dos dados
     train, test = train_test_split(dados[[col_x] + larguras], test_size=0.3, random_state=4321)
     
@@ -60,12 +62,13 @@ def random_search(col_x, SEED=4321, popsize=1000, gens=1000):
     train[f'{col_x}_mean'] = pd.qcut(train[col_x], 150)
     test[f'{col_x}_mean'] = pd.qcut(test[col_x], 150)
     train_por_bin = pd.DataFrame(gera_stats(train, col_x))
-    #test_por_bin = pd.DataFrame(gera_stats(test, col_x))
+    test_por_bin = pd.DataFrame(gera_stats(test, col_x))
 
     # ## Treinar Operons para Média, Desvio Padrão e Covariâncias
 
     # Selecionar feature para o treinamento
     X_train_bins = train_por_bin[col_x].values.reshape(-1, 1).astype(np.float64)
+    X_test_bins = test_por_bin[col_x].values.reshape(-1, 1).astype(np.float64)
 
     # Configuração do Operon
     hyper = {
@@ -80,14 +83,13 @@ def random_search(col_x, SEED=4321, popsize=1000, gens=1000):
         'objectives': ['r2', 'length']
     }
 
-    # Dicionário para armazenar os modelos
-    modelos = {}
     print("\n[1/3] TREINANDO MODELOS DE MÉDIA")
     print("-" * 80)
     for largura in larguras:
         print(f"Treinando MÉDIA para {largura}...")
         y = train_por_bin[f'{largura}_mean'].values.astype(np.float64)
         modelo = p.treinar_operon(hyper, X_train_bins, y)
+        #p._operon_select_by_r2(modelo)
         modelos[f'{largura}_mean'] = modelo
     
     print("\n[2/3] TREINANDO MODELOS DE DESVIO PADRÃO")
@@ -96,6 +98,7 @@ def random_search(col_x, SEED=4321, popsize=1000, gens=1000):
         print(f"Treinando DESVIO PADRÃO para {largura}...")
         y = train_por_bin[f'{largura}_std'].values.astype(np.float64)
         modelo = p.treinar_operon(hyper, X_train_bins, y)
+        #p._operon_select_by_r2(modelo)
         modelos[f'{largura}_std'] = modelo
 
     print("\n[3/3] TREINANDO MODELOS DE COVARIÂNCIA")
@@ -104,12 +107,47 @@ def random_search(col_x, SEED=4321, popsize=1000, gens=1000):
         print(f"Treinando COVARIÂNCIA para {l1} x {l2}...")
         y = train_por_bin[f'cov_{l1}_{l2}'].values.astype(np.float64)
         modelo = p.treinar_operon(hyper, X_train_bins, y)
+        #p._operon_select_by_r2(modelo)
         modelos[f'cov_{l1}_{l2}'] = modelo
 
-    #p.salva_equacoes_html(modelos, col_x, f"n4d_{col_x}_{SEED}_{popsize}")
+    metrics_data = []
+    for model_name, model in modelos.items():
+        # Predictions on train
+        y_train_pred = model.predict(X_train_bins)
+        y_train_true = train_por_bin[model_name].values.astype(np.float64)
+        mse_train = mean_squared_error(y_train_true, y_train_pred)
+        try:
+            r2_train = model.stats_['model_r2']
+        except:
+            r2_train = r2_score(y_train_true, y_train_pred)
+            model.stats_['model_r2'] = r2_train
+        
+        # Predictions on test
+        y_test_pred = model.predict(X_test_bins)
+        y_test_pred = np.nan_to_num(y_test_pred, nan=0.0, posinf=0.0, neginf=0.0)
+        y_test_true = test_por_bin[model_name].values.astype(np.float64)
+        mse_test = mean_squared_error(y_test_true, y_test_pred)
+        r2_test = r2_score(y_test_true, y_test_pred)
+        
+        metrics_data.append({
+            'Model': model_name,
+            'popsize': popsize,
+            'complexity': model.stats_['model_complexity'],
+            'R2 Train': r2_train,
+            'MSE Train': mse_train,
+            'R2 Test': r2_test,
+            'MSE Test': mse_test
+        })
+    
+    df_metrics = pd.DataFrame(metrics_data)
+    df_metrics.to_csv(f"results/metrics_{col_x}_{popsize}.csv", index=False)
+    p.salva_equacoes_html(modelos, col_x, f"n4d_{col_x}_{popsize}")
 
-    # ## Gerar Amostras do Conjunto de Teste com Normal Multivariada
-    #X_test_bins = test_por_bin[col_x].values.reshape(-1, 1).astype(np.float64)
+
+# ## Gerar Amostras do Conjunto de Teste com Normal Multivariada
+def gerar_amostras(col_x, SEED=4321):
+    # Faz o split e o agrupamento dos dados
+    train, test = train_test_split(dados[[col_x] + larguras], test_size=0.3, random_state=4321)
     X_test = test[[col_x]].astype(np.float64)
     n_samples = len(X_test)
 
@@ -192,7 +230,7 @@ def random_search(col_x, SEED=4321, popsize=1000, gens=1000):
     print(f"   - Amostras: {n_samples}")
     print(f"   - Matrizes corrigidas: {n_correcoes} ({100*n_correcoes/n_samples:.1f}%)\n")
     df_amostras = pd.DataFrame(amostras)
-    df_amostras.to_csv(f"results/amostras_{col_x}_{popsize}.csv", index=False)
+    df_amostras.to_csv(f"results/amostras_{col_x}_{SEED}.csv", index=False)
 
     print(f"Estatísticas:\n")
     for nome in larguras:
@@ -234,20 +272,31 @@ def random_search(col_x, SEED=4321, popsize=1000, gens=1000):
     fig, axes = plt.subplots(1, 2, figsize=(16, 6))
     p.plot_corr(corr_real, axes[0], larguras, title='Matriz de correlação dos dados de teste', type='inf')
     p.plot_corr(corr_gerada, axes[1], larguras, title=r'Matriz de correlação das amostras normais, $\Delta$=%.4f'%diff, type='inf')
-    fig.savefig(f"results/corr_{col_x}_{popsize}.png")
+    fig.savefig(f"results/corr_{col_x}_{SEED}.png")
 
     # ### Diagramas de diagnóstico coloridos pela feature
 
     p.show_bpt(df_amostras, col_x, title="Estimadores Operon + Amostras Normal4D", densities=True)
-    plt.savefig(f"results/bpt_{col_x}_{popsize}.png")
+    plt.savefig(f"results/bpt_{col_x}_{SEED}.png")
 
     p.show_whan(df_amostras, col_x, title="Estimadores Operon + Amostras Normal4D", densities=True)
-    plt.savefig(f"results/whan_{col_x}_{popsize}.png")
+    plt.savefig(f"results/whan_{col_x}_{SEED}.png")
 
 
-## Random search não ajuda selecionar o Operon, pois o modelo já está simplificado e é bom com parâmetros tradicionais. Onde ele vai poder ajudar é na geração das amostras, para ver se gera o conjunto mais parecido com o original em termos do grafico de densidades.
+## Random search não ajuda selecionar o Operon, pois o modelo já está simplificado e é bom com parâmetros tradicionais. 
+# Onde ele vai poder ajudar é na geração das amostras, para ver se gera o conjunto mais parecido com o original em termos do grafico de densidades.
+
+def busca_equacoes():
+    pops = [100, 200, 300, 400, 500, 600, 700, 800, 900]
+    pops += [1000, 1500, 2000, 2500, 3000, 3500, 4000, 4500, 5000]
+    for pop in tqdm(pops):
+        grid_search(F.azmass.value, 4321, pop, 1000)
+        grid_search(F.atflux.value, 4321, pop, 1000)
+        grid_search(F.mass.value, 4321, pop, 1000)
+
+def busca_amostras():
+    pass
 
 # ### MAIN
 if __name__ == "__main__":
-    for pop in tqdm(range(500, 5001, 500)):
-        random_search(F.azmass.value, 4321, pop, 1000)
+    busca_amostras()

@@ -221,7 +221,6 @@ class PlotsMetricas(object):
     def treinar_operon(self, operon_config, X, y, plot=False):
         modelo = SymbolicRegressor(**operon_config)
         modelo.fit(X, y)
-        self._operon_select_by_r2(modelo)
         if plot: self.plot_entropy(modelo)
         return modelo
 
@@ -417,7 +416,7 @@ class PlotsMetricas(object):
     def show_bpt(self, dados, color=None, title="Dados reais da síntese", densities=False, show=True):
         if color is None:
             plt.figure(figsize=(8.4, 7))
-            plt.scatter(dados[T.nii_ha.value], dados[T.oiii_hb.value], color='#999999', alpha=0.8, s=5, edgecolors='none')
+            plt.scatter(dados[T.nii_ha.value], dados[T.oiii_hb.value], color='#7FD6AB', alpha=0.8, s=5, edgecolors='none')
         else:
             plt.figure(figsize=(10, 7))
             scatter = plt.scatter(dados[T.nii_ha.value], dados[T.oiii_hb.value], c=dados[color], 
@@ -431,7 +430,7 @@ class PlotsMetricas(object):
     def show_whan(self, dados, color=None, title="Dados reais da síntese", densities=False, show=True):
         if color is None:
             plt.figure(figsize=(8.4, 7))
-            plt.scatter(dados[T.nii_ha.value] , dados[T.ha.value], color="#999999", alpha=0.8, s=5, edgecolors='none')
+            plt.scatter(dados[T.nii_ha.value] , dados[T.ha.value], color="#7FD6AB", alpha=0.8, s=5, edgecolors='none')
         else:
             plt.figure(figsize=(10, 7))
             scatter = plt.scatter(dados[T.nii_ha.value] , dados[T.ha.value], c=dados[color], 
@@ -1435,9 +1434,9 @@ class PlotsMetricas(object):
         else:
             X, Y, Z, _ = self.get_densities(dados_x, dados_y)
             lvls = [0.24204035, 0.46083535, 1.138656, 1.85108968] # bpt dados reais
-        plt.contour(X, Y, Z, colors='purple', alpha=0.4, levels=lvls)
+        plt.contour(X, Y, Z, colors='purple', alpha=0.5, levels=lvls)
         #sns.kdeplot(x=dados_x, y=dados_y, cmap=cor, fill=False, levels=(0.1, 0.2, 0.4, 0.6))
-        plt.plot([], [], '-', color='purple', alpha=0.4, linewidth=1, label='Níveis de densidade numérica')
+        plt.plot([], [], '-', color='purple', alpha=0.5, linewidth=1, label='Níveis de densidade numérica')
 
     def bpt_config(self, title='Diagrama BPT', sfx=''):
         self.plot_KeKa() # Linhas de separação teóricas
