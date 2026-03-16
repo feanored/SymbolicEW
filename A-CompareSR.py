@@ -12,54 +12,61 @@ from metricas_plots import PlotsMetricas, T, F
 np.seterr(all='ignore')
 p = PlotsMetricas()
 
+rf_config = {
+    "algorithm": "RandomForest",
+    "kwargs": {
+        "n_estimators": 100,
+        "max_depth": None,
+        "min_samples_split": 2,
+        "min_samples_leaf": 2,
+        "random_state": 4321,
+        "n_jobs": 12
+    }
+}
+
 operon_config = {
     "algorithm": "Operon",
     "kwargs": {
         "population_size": 1000,
-        "generations": 500,
         "optimizer_iterations": 16, # para se igualar ao padrão do PySR
-        "allowed_symbols": "add,sub,mul,aq,constant,variable,square,sqrtabs,logabs,exp,tanh",
-        "max_length": 25,
+        "allowed_symbols": "add,sub,mul,aq,constant,variable,square,exp,tanh",
+        "max_depth": 50,
         "model_selection_criterion": "bayesian_information_criterion",
-        "n_threads": 10,
+        "n_threads": 12,
         "objectives": ["mse", "length"]
     }
 }
+
 pysr_multi = {
     "algorithm": "PySR",
     "kwargs": {
         "populations": 10,
         "population_size": 100,
-        "niterations": 500,
         "binary_operators": ["+", "-", "*", "/"],
-        "unary_operators": [
-            "square", "exp", "tanh",
-            "sqrtabs(x) = sqrt(abs(x))",
-            "logabs(x) = log(abs(x))",
-        ],
-        "maxsize": 25,
+        "unary_operators": ["square", "exp", "tanh"],
+        "maxdepth": 50,
         "model_selection": "accuracy",
         "parallelism": "multiprocessing",
-        "procs": 10,
+        "procs": 12,
         "verbosity": 1
     }
 }
+
 pysr_single = {
     "algorithm": "PySR",
     "kwargs": {
         "populations": 1, # for single-island
         "population_size": 1000,
-        "niterations": 500,
         "binary_operators": ["+", "-", "*", "/"],
         "unary_operators": [
             "square", "exp", "tanh",
             "sqrtabs(x) = sqrt(abs(x))",
             "logabs(x) = log(abs(x))",
         ],
-        "maxsize": 25,
+        "maxdepth": 50,
         "model_selection": "accuracy",
         "parallelism": "multithreading",
-        "procs": 10,
+        "procs": 12,
         "verbosity": 1
     }
 }
@@ -68,6 +75,20 @@ def get_feature_target_names():
     features = [F.azmass.value, F.atflux.value, F.mass.value]
     targets = [T.nii.value, T.ha.value, T.oiii.value, T.hb.value]
     return features, targets
+
+def train_rf_models(X_train, y_train, config):
+    from sklearn.ensemble import RandomForestRegressor
+    rf_kwargs = config["kwargs"]
+    models = []
+    elapseds = []
+    for i in range(y_train.shape[1]):
+        start = time.perf_counter()
+        model = RandomForestRegressor(**rf_kwargs)
+        model.fit(X_train, y_train[:, i])
+        elapsed = time.perf_counter() - start
+        elapseds.append(elapsed)
+        models.append(model)
+    return models, elapseds
 
 def train_operon_models(X_train, y_train, config):
     from pyoperon.sklearn import SymbolicRegressor
@@ -90,10 +111,11 @@ def train_pysr_models(X_train, y_train, config):
     elapseds = []
     for i in range(y_train.shape[1]):
         start = time.perf_counter() # segundos
-        model = PySRRegressor(**pysr_kwargs, extra_sympy_mappings={
-            "sqrtabs": lambda x: sp.sqrt(sp.Abs(x)),
-            "logabs": lambda x: sp.log(sp.Abs(x))
-        })
+        model = PySRRegressor(**pysr_kwargs
+            # , extra_sympy_mappings={
+            # "sqrtabs": lambda x: sp.sqrt(sp.Abs(x)),
+            # "logabs": lambda x: sp.log(sp.Abs(x))}
+        )
         model.fit(X_train, y_train[:, i])
         elapsed = time.perf_counter() - start
         elapseds.append(elapsed)
@@ -136,6 +158,10 @@ def evaluate_models(models, predict_fn, X_train, X_test, y_train, y_test, algori
         elif algorithm == 'Operon':
             complexy = model.stats_['model_complexity']
             equations = model.get_model_string(model.model_, precision=6).replace('^', '**')
+        elif algorithm == 'RandomForest':
+            avg_depth = int(np.mean([e.get_depth() for e in model.estimators_]))
+            complexy = model.n_estimators * avg_depth
+            equations = "N/A"
 
         # Exibe gráfico real X predito
         plt.subplots(figsize=(7, 7))
@@ -174,7 +200,10 @@ def operon_predict(model, X):
 def pysr_predict(model, X):
     return model.predict(X)
 
-def run_comparison(pysr=None, operon=False):
+def rf_predict(model, X):
+    return model.predict(X)
+
+def run_comparison(pysr=None, operon=False, rf=False):
     os.makedirs("results/compare_sr", exist_ok=True)
     output_path = os.path.join("results/compare_sr", "compare_sr_results.csv")
     
@@ -192,6 +221,12 @@ def run_comparison(pysr=None, operon=False):
     X_train_scaled = scaler.fit_transform(X_train)
     X_test_scaled = scaler.transform(X_test)
     results_rows = []
+
+    if rf:
+        print("\n Treinando RandomForest...")
+        rf_models, elapsed = train_rf_models(X_train_scaled, y_train, rf_config)
+        results_rows.extend(evaluate_models(rf_models, rf_predict, X_train_scaled, X_test_scaled, y_train, y_test, "RandomForest", targets, elapsed))
+        gerar_diagramas("RandomForest")
 
     if operon:
         print("\n Treinando Operon...")
@@ -211,7 +246,7 @@ def run_comparison(pysr=None, operon=False):
             results_rows.extend(evaluate_models(pysr_models, pysr_predict, X_train_scaled, X_test_scaled, y_train, y_test, "PySR", targets, elapsed))
             gerar_diagramas("PySR")
 
-    if operon or (pysr is not None and pysr != 'read'):
+    if rf or operon or (pysr is not None and pysr != 'read'):
         df_results = pd.DataFrame(results_rows)
         df_results.to_csv(output_path, index=False)
         print("\nResultados salvos em:", output_path)
@@ -237,4 +272,4 @@ def gerar_diagramas(algo):
 
 
 if __name__ == "__main__":
-    run_comparison(pysr='read', operon=False)
+    run_comparison(pysr='multi', operon=True, rf=True)
