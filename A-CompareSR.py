@@ -238,7 +238,6 @@ def histogramas_validation():
     X = df[features].astype(float).values
     y = df[targets].astype(float).values
     _, _, _, y_test = train_test_split(X, y, test_size=0.3, random_state=4321)
-
     _, ax = plt.subplots(2, 2, figsize=(16, 12))
     p.histogram_v(y_test[:, 0], 'Validation Set for '+targets[0], ax[0, 0], cor='darkblue', bins=80, lim=(-1, 2.5))
     p.histogram_v(y_test[:, 1], 'Validation Set for '+targets[1], ax[0, 1], cor='darkblue', bins=80, lim=(-1, 2.5))
@@ -258,6 +257,7 @@ def gerar_diagramas(algo):
     df_amostras['nii_halpha_ew'] = df_amostras['nii_6584_ew'] - df_amostras['halpha_ew']
     df_amostras['oiii_hbeta_ew'] = df_amostras['oiii_5007_ew'] - df_amostras['hbeta_ew']
 
+    # Histogramas
     _, ax = plt.subplots(2, 2, figsize=(16, 12))
     p.histogram_v(df_amostras[T.nii.value], f'{algo} Sample for '+T.nii.value, ax[0, 0], cor='darkgreen', bins=80, lim=(-1, 2.5))
     p.histogram_v(df_amostras[T.ha.value], f'{algo} Sample for '+T.ha.value, ax[0, 1], cor='darkgreen', bins=80, lim=(-1, 2.5))
@@ -265,8 +265,8 @@ def gerar_diagramas(algo):
     p.histogram_v(df_amostras[T.hb.value], f'{algo} Sample for '+T.hb.value, ax[1, 1], cor='darkgreen', bins=80, lim=(-1, 2.5))
     plt.savefig(f'results/compare_sr/histogram_{algo}.png')
     plt.close()
-    return
 
+    # Diagramas
     p.show_bpt(df_amostras, title=f"Amostras do {algo}", densities=True, show=False)
     plt.savefig(f'results/compare_sr/bpt_{algo}.png')
     plt.close()
