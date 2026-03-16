@@ -793,10 +793,10 @@ class PlotsMetricas(object):
         plt.ylabel(y.name)
         plt.show()
     
-    def histogram_v(self, dados, title, ax, density=False,  lim=None, cor=None, bins=100):
-        ax.set_xlabel('Valor')
-        ax.set_ylabel('Contagem')
-        if lim is not None: ax.xlim(lim)
+    def histogram_v(self, dados, title, ax, density=True, lim=None, cor=None, bins=100):
+        ax.set_xlabel('Value')
+        ax.set_ylabel('Density')
+        if lim is not None: ax.set_xlim(lim)
         ax.hist(dados.astype("float"), bins=bins, density=density, color=cor)
         ax.set_title(title)
 

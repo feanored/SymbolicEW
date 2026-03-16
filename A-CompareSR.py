@@ -28,9 +28,8 @@ operon_config = {
     "algorithm": "Operon",
     "kwargs": {
         "population_size": 1000,
-        "optimizer_iterations": 16, # para se igualar ao padrão do PySR
         "allowed_symbols": "add,sub,mul,aq,constant,variable,square,exp,tanh",
-        "max_depth": 50,
+        "max_depth": 25,
         "model_selection_criterion": "bayesian_information_criterion",
         "n_threads": 12,
         "objectives": ["mse", "length"]
@@ -44,28 +43,9 @@ pysr_multi = {
         "population_size": 100,
         "binary_operators": ["+", "-", "*", "/"],
         "unary_operators": ["square", "exp", "tanh"],
-        "maxdepth": 50,
+        "maxdepth": 25,
         "model_selection": "accuracy",
         "parallelism": "multiprocessing",
-        "procs": 12,
-        "verbosity": 1
-    }
-}
-
-pysr_single = {
-    "algorithm": "PySR",
-    "kwargs": {
-        "populations": 1, # for single-island
-        "population_size": 1000,
-        "binary_operators": ["+", "-", "*", "/"],
-        "unary_operators": [
-            "square", "exp", "tanh",
-            "sqrtabs(x) = sqrt(abs(x))",
-            "logabs(x) = log(abs(x))",
-        ],
-        "maxdepth": 50,
-        "model_selection": "accuracy",
-        "parallelism": "multithreading",
         "procs": 12,
         "verbosity": 1
     }
@@ -236,9 +216,7 @@ def run_comparison(pysr=None, operon=False, rf=False):
 
     if pysr is not None:
         print("\n Treinando PySR...")
-        if pysr == 'single': # Escolher aqui se é single ou multi, threading
-            pysr_models, elapsed = train_pysr_models(X_train_scaled, y_train, pysr_single)
-        elif pysr == 'multi':
+        if pysr == 'train':
             pysr_models, elapsed = train_pysr_models(X_train_scaled, y_train, pysr_multi)
         elif pysr == 'read':
             pysr_models, elapsed = read_pysr_models(pysr_multi, targets, '20260315_')
@@ -253,6 +231,22 @@ def run_comparison(pysr=None, operon=False, rf=False):
     else:
         print("Nenhum modelo foi ativado para o teste!")
 
+def histogramas_validation():
+    # Histogramas do conjunto de validação
+    df = pd.read_csv("dados/ariel_limpo_log10.csv.gz", compression="gzip")
+    features, targets = get_feature_target_names()
+    X = df[features].astype(float).values
+    y = df[targets].astype(float).values
+    _, _, _, y_test = train_test_split(X, y, test_size=0.3, random_state=4321)
+
+    _, ax = plt.subplots(2, 2, figsize=(16, 12))
+    p.histogram_v(y_test[:, 0], 'Validation Set for '+targets[0], ax[0, 0], cor='darkblue', bins=80, lim=(-1, 2.5))
+    p.histogram_v(y_test[:, 1], 'Validation Set for '+targets[1], ax[0, 1], cor='darkblue', bins=80, lim=(-1, 2.5))
+    p.histogram_v(y_test[:, 2], 'Validation Set for '+targets[2], ax[1, 0], cor='darkblue', bins=80, lim=(-1, 2.5))
+    p.histogram_v(y_test[:, 3], 'Validation Set for '+targets[3], ax[1, 1], cor='darkblue', bins=80, lim=(-1, 2.5))    
+    plt.savefig(f'results/compare_sr/histogram_validation.png')
+    plt.close()
+
 def gerar_diagramas(algo):
     series = []
     _, targets = get_feature_target_names()
@@ -263,6 +257,16 @@ def gerar_diagramas(algo):
     df_amostras = pd.concat(series, axis=1)
     df_amostras['nii_halpha_ew'] = df_amostras['nii_6584_ew'] - df_amostras['halpha_ew']
     df_amostras['oiii_hbeta_ew'] = df_amostras['oiii_5007_ew'] - df_amostras['hbeta_ew']
+
+    _, ax = plt.subplots(2, 2, figsize=(16, 12))
+    p.histogram_v(df_amostras[T.nii.value], f'{algo} Sample for '+T.nii.value, ax[0, 0], cor='darkgreen', bins=80, lim=(-1, 2.5))
+    p.histogram_v(df_amostras[T.ha.value], f'{algo} Sample for '+T.ha.value, ax[0, 1], cor='darkgreen', bins=80, lim=(-1, 2.5))
+    p.histogram_v(df_amostras[T.oiii.value], f'{algo} Sample for '+T.oiii.value, ax[1, 0], cor='darkgreen', bins=80, lim=(-1, 2.5))
+    p.histogram_v(df_amostras[T.hb.value], f'{algo} Sample for '+T.hb.value, ax[1, 1], cor='darkgreen', bins=80, lim=(-1, 2.5))
+    plt.savefig(f'results/compare_sr/histogram_{algo}.png')
+    plt.close()
+    return
+
     p.show_bpt(df_amostras, title=f"Amostras do {algo}", densities=True, show=False)
     plt.savefig(f'results/compare_sr/bpt_{algo}.png')
     plt.close()
@@ -272,4 +276,5 @@ def gerar_diagramas(algo):
 
 
 if __name__ == "__main__":
-    run_comparison(pysr='multi', operon=True, rf=True)
+    # histogramas_validation()
+    run_comparison(pysr='train', operon=True, rf=True)
