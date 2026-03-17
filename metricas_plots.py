@@ -78,15 +78,15 @@ class PlotsMetricas(object):
         return self.targets
 
     def setUnidades(self):
-        self.unidades[T.nii.value]    = r'$ \log EW([NII]6584) ~(\AA) $'
-        self.unidades[T.oiii.value]   = r'$ \log EW([OIII]5007) ~(\AA) $'
-        self.unidades[T.ha.value]     = r'$ \log EW(H\alpha) ~(\AA) $'
-        self.unidades[T.hb.value]     = r'$ \log EW(H\beta) ~(\AA) $'
-        self.unidades[F.atflux.value] = r'$ \log t_{flux} ~(yr) $'
-        self.unidades[F.atmass.value] = r'$ \log t_{mass} ~(yr) $'
+        self.unidades[T.nii.value]    = r'$ \log EW([NII]6584) $'
+        self.unidades[T.oiii.value]   = r'$ \log EW([OIII]5007) $'
+        self.unidades[T.ha.value]     = r'$ \log EW(H\alpha) $'
+        self.unidades[T.hb.value]     = r'$ \log EW(H\beta) $'
+        self.unidades[F.atflux.value] = r'$ \log t_{\text{flux}} $'
+        self.unidades[F.atmass.value] = r'$ \log t_{\text{mass}} $'
         self.unidades[F.azflux.value] = r'$ \log (Z_{ergs}/F_\odot) $'
         self.unidades[F.azmass.value] = r'$ \log (Z_{mass}/Z_\odot) $'
-        self.unidades[F.mass.value]   = r'$ \log mass ~(M_\odot) $'
+        self.unidades[F.mass.value]   = r'$ \log (mass/M_\odot) $'
     
     def setOptions(self):
         #if platform.system() == "Windows":

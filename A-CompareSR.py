@@ -3,6 +3,7 @@ import time
 import sympy as sp
 import numpy as np
 import pandas as pd
+from datetime import datetime
 import smplotlib # type: ignore
 import matplotlib.pyplot as plt
 from sklearn.preprocessing import StandardScaler
@@ -27,16 +28,19 @@ rf_config = {
 operon_config = {
     "algorithm": "Operon",
     "kwargs": {
+        "random_state": 4321,
         "population_size": 1000,
-        "allowed_symbols": "add,sub,mul,aq,constant,variable,square,exp,tanh",
+        "allowed_symbols": "add,sub,mul,div,constant,variable,square,exp,tanh",
+        "max_length": 25,
         "max_depth": 25,
+        "optimizer": "lbfgs",
         "model_selection_criterion": "bayesian_information_criterion",
-        "n_threads": 12,
-        "objectives": ["mse", "length"]
+        "objectives": ["r2", "length"],
+        "n_threads": 12
     }
 }
 
-pysr_multi = {
+pysr_config = {
     "algorithm": "PySR",
     "kwargs": {
         "populations": 10,
@@ -185,7 +189,8 @@ def rf_predict(model, X):
 
 def run_comparison(pysr=None, operon=False, rf=False):
     os.makedirs("results/compare_sr", exist_ok=True)
-    output_path = os.path.join("results/compare_sr", "compare_sr_results.csv")
+    timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+    output_path = os.path.join("results/compare_sr", f"results_{timestamp}.csv")
     
     print("\n Carregando dados...")
     df = pd.read_csv("dados/ariel_limpo_log10.csv.gz", compression="gzip")
@@ -207,22 +212,25 @@ def run_comparison(pysr=None, operon=False, rf=False):
         rf_models, elapsed = train_rf_models(X_train_scaled, y_train, rf_config)
         results_rows.extend(evaluate_models(rf_models, rf_predict, X_train_scaled, X_test_scaled, y_train, y_test, "RandomForest", targets, elapsed))
         gerar_diagramas("RandomForest")
+        combinar_fits("RandomForest")
 
     if operon:
         print("\n Treinando Operon...")
         operon_models, elapsed = train_operon_models(X_train_scaled, y_train, operon_config)
         results_rows.extend(evaluate_models(operon_models, operon_predict, X_train_scaled, X_test_scaled, y_train, y_test, "Operon", targets, elapsed))
         gerar_diagramas("Operon")
+        combinar_fits("Operon")
 
     if pysr is not None:
         print("\n Treinando PySR...")
         if pysr == 'train':
-            pysr_models, elapsed = train_pysr_models(X_train_scaled, y_train, pysr_multi)
+            pysr_models, elapsed = train_pysr_models(X_train_scaled, y_train, pysr_config)
         elif pysr == 'read':
-            pysr_models, elapsed = read_pysr_models(pysr_multi, targets, '20260315_')
+            pysr_models, elapsed = read_pysr_models(pysr_config, targets, '20260315_')
         if pysr_models is not None:
             results_rows.extend(evaluate_models(pysr_models, pysr_predict, X_train_scaled, X_test_scaled, y_train, y_test, "PySR", targets, elapsed))
             gerar_diagramas("PySR")
+            combinar_fits("PySR")
 
     if rf or operon or (pysr is not None and pysr != 'read'):
         df_results = pd.DataFrame(results_rows)
@@ -239,30 +247,40 @@ def histogramas_validation():
     y = df[targets].astype(float).values
     _, _, _, y_test = train_test_split(X, y, test_size=0.3, random_state=4321)
     _, ax = plt.subplots(2, 2, figsize=(16, 12))
-    p.histogram_v(y_test[:, 0], 'Validation Set for '+targets[0], ax[0, 0], cor='darkblue', bins=80, lim=(-1, 2.5))
-    p.histogram_v(y_test[:, 1], 'Validation Set for '+targets[1], ax[0, 1], cor='darkblue', bins=80, lim=(-1, 2.5))
-    p.histogram_v(y_test[:, 2], 'Validation Set for '+targets[2], ax[1, 0], cor='darkblue', bins=80, lim=(-1, 2.5))
-    p.histogram_v(y_test[:, 3], 'Validation Set for '+targets[3], ax[1, 1], cor='darkblue', bins=80, lim=(-1, 2.5))    
+    p.histogram_v(y_test[:, 0], 'Validation Set for '+p.unidades[targets[0]], ax[0, 0], cor='darkblue', bins=80, lim=(-1, 2.5))
+    p.histogram_v(y_test[:, 1], 'Validation Set for '+p.unidades[targets[1]], ax[0, 1], cor='darkblue', bins=80, lim=(-1, 2.5))
+    p.histogram_v(y_test[:, 2], 'Validation Set for '+p.unidades[targets[2]], ax[1, 0], cor='darkblue', bins=80, lim=(-1, 2.5))
+    p.histogram_v(y_test[:, 3], 'Validation Set for '+p.unidades[targets[3]], ax[1, 1], cor='darkblue', bins=80, lim=(-1, 2.5))    
     plt.savefig(f'results/compare_sr/histogram_validation.png')
     plt.close()
 
 def gerar_diagramas(algo):
-    series = []
-    _, targets = get_feature_target_names()
-    for target in targets:
-        s = pd.read_csv(f"results/compare_sr/amostras_{algo}_{target}.csv").iloc[:, 0]
-        s.name = target
-        series.append(s)
-    df_amostras = pd.concat(series, axis=1)
-    df_amostras['nii_halpha_ew'] = df_amostras['nii_6584_ew'] - df_amostras['halpha_ew']
-    df_amostras['oiii_hbeta_ew'] = df_amostras['oiii_5007_ew'] - df_amostras['hbeta_ew']
+    try:
+        series = []
+        _, targets = get_feature_target_names()
+        for target in targets:
+            s = pd.read_csv(f"results/compare_sr/amostras_{algo}_{target}.csv").iloc[:, 0]
+            s.name = target
+            series.append(s)
+        df_amostras = pd.concat(series, axis=1)
+        df_amostras['nii_halpha_ew'] = df_amostras['nii_6584_ew'] - df_amostras['halpha_ew']
+        df_amostras['oiii_hbeta_ew'] = df_amostras['oiii_5007_ew'] - df_amostras['hbeta_ew']
+        df_amostras.to_csv(f'results/compare_sr/amostras_{algo}.csv', index=False)
+        for target in targets:
+            os.remove(f"results/compare_sr/amostras_{algo}_{target}.csv")
+    except:
+        print(f"Ocorreu um erro ao juntar as amostras do {algo}!")
+        try:
+            df_amostras = pd.read_csv(f'results/compare_sr/amostras_{algo}.csv')
+        except:
+            return
 
     # Histogramas
     _, ax = plt.subplots(2, 2, figsize=(16, 12))
-    p.histogram_v(df_amostras[T.nii.value], f'{algo} Sample for '+T.nii.value, ax[0, 0], cor='darkgreen', bins=80, lim=(-1, 2.5))
-    p.histogram_v(df_amostras[T.ha.value], f'{algo} Sample for '+T.ha.value, ax[0, 1], cor='darkgreen', bins=80, lim=(-1, 2.5))
-    p.histogram_v(df_amostras[T.oiii.value], f'{algo} Sample for '+T.oiii.value, ax[1, 0], cor='darkgreen', bins=80, lim=(-1, 2.5))
-    p.histogram_v(df_amostras[T.hb.value], f'{algo} Sample for '+T.hb.value, ax[1, 1], cor='darkgreen', bins=80, lim=(-1, 2.5))
+    p.histogram_v(df_amostras[T.nii.value], f'{algo} Sample for '+p.unidades[T.nii.value], ax[0, 0], cor='darkgreen', bins=80, lim=(-1, 2.5))
+    p.histogram_v(df_amostras[T.ha.value], f'{algo} Sample for '+p.unidades[T.ha.value], ax[0, 1], cor='darkgreen', bins=80, lim=(-1, 2.5))
+    p.histogram_v(df_amostras[T.oiii.value], f'{algo} Sample for '+p.unidades[T.oiii.value], ax[1, 0], cor='darkgreen', bins=80, lim=(-1, 2.5))
+    p.histogram_v(df_amostras[T.hb.value], f'{algo} Sample for '+p.unidades[T.hb.value], ax[1, 1], cor='darkgreen', bins=80, lim=(-1, 2.5))
     plt.savefig(f'results/compare_sr/histogram_{algo}.png')
     plt.close()
 
@@ -273,6 +291,31 @@ def gerar_diagramas(algo):
     p.show_whan(df_amostras, title=f"Amostras do {algo}", densities=True, show=False)
     plt.savefig(f'results/compare_sr/whan_{algo}.png')
     plt.close()
+
+def combinar_fits(algorithm):
+    from PIL import Image
+    _, targets = get_feature_target_names()
+    # targets = [nii, ha, oiii, hb] → layout 2x2 já na ordem correta
+    ordem = [targets[0], targets[1], targets[2], targets[3]]  # nii, ha, oiii, hb
+
+    imgs = []
+    for target in ordem:
+        path = f'results/compare_sr/fit_{algorithm}_{target}.png'
+        imgs.append(Image.open(path))
+
+    w, h = imgs[0].size
+    combined = Image.new('RGB', (w * 2, h * 2), color='white')
+    positions = [(0, 0), (w, 0), (0, h), (w, h)]
+    for img, pos in zip(imgs, positions):
+        combined.paste(img, pos)
+
+    out_path = f'results/compare_sr/fits_{algorithm}.png'
+    combined.save(out_path, dpi=(300, 300))
+    print(f"Figura combinada salva em: {out_path}")
+    
+    for target in ordem:
+        path = f'results/compare_sr/fit_{algorithm}_{target}.png'
+        os.remove(path) if os.path.exists(out_path) else None
 
 
 if __name__ == "__main__":
