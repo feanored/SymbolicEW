@@ -56,6 +56,21 @@ pysr_config = {
     },
 }
 
+eggp_config = {
+    "algorithm": "EGGP",
+    "kwargs": {
+        "gen": 100,
+        "nPop": 100,
+        "maxSize": 25,
+        "nTournament": 5,
+        "nonterminals": "add,sub,mul,div,square,exp,tanh",
+        "loss": "MSE",
+        "optIter": 50,
+        "optRepeat": 2,
+        "simplify": False,
+    },
+}
+
 
 def get_feature_target_names():
     features = [F.azmass.value, F.atflux.value, F.mass.value]
@@ -133,6 +148,53 @@ def read_pysr_models(config, targets, prefix=""):
     return models, elapseds
 
 
+# Divide X e y em n_bins subintervalos de igual frequência baseado em y.
+def split_random_stratified(X, y, n_bins=10, random_state=4321):
+    rng = np.random.default_rng(random_state)
+
+    # Estratos baseados na distribuição de y
+    strata = pd.qcut(y, q=n_bins, labels=False, duplicates="drop")
+
+    # Para cada estrato, distribui as amostras aleatoriamente entre os n_bins subconjuntos
+    indices = [[] for _ in range(n_bins)]
+    for s in range(strata.max() + 1):
+        stratum_idx = np.where(strata == s)[0]
+        rng.shuffle(stratum_idx)
+        for i, idx in enumerate(stratum_idx):
+            indices[i % n_bins].append(idx)
+
+    Xs, ys = [], []
+    for idx in indices:
+        idx = np.array(idx)
+        Xs.append(X[idx])
+        ys.append(y[idx])
+
+    return Xs, ys
+
+
+def train_eggp_models(X_train, y_train, config):
+    from eggp import EGGP
+
+    models = []
+    elapseds = []
+    for i in range(y_train.shape[1]):
+        # Partição em 10 ilhas
+        Xs_train, ys_train = split_random_stratified(X_train, y_train[:, i], n_bins=10)
+
+        # Verifica balanço das ilhas
+        for j, (Xi, yi) in enumerate(zip(Xs_train, ys_train)):
+            print(f"Ilha {j:2d}: n={len(yi):6d}  y=[{yi.min():.3f}, {yi.max():.3f}]")
+
+        # Treino multi-view
+        start = time.perf_counter()  # segundos
+        model = EGGP(**config["kwargs"])
+        model.fit_mvsr(Xs_train, ys_train)
+        elapsed = time.perf_counter() - start
+        elapseds.append(elapsed)
+        models.append(model)
+    return models, elapseds
+
+
 def evaluate_models(
     models, predict_fn, X_train, X_test, y_train, y_test, algorithm, targets, elapsed
 ):
@@ -141,11 +203,15 @@ def evaluate_models(
         return rows
 
     for i, model in enumerate(models):
-        # Calcula métricas
+        # Previsões no conjunto de treinamento
         y_pred_train = predict_fn(model, X_train)
-        y_pred_test = predict_fn(model, X_test)
         y_pred_train = np.nan_to_num(y_pred_train, nan=0.0, posinf=0.0, neginf=0.0)
+
+        # Previsões no conjunto de validação
+        y_pred_test = predict_fn(model, X_test)
         y_pred_test = np.nan_to_num(y_pred_test, nan=0.0, posinf=0.0, neginf=0.0)
+
+        # Calcula métricas
         mse_train = mean_squared_error(y_train[:, i], y_pred_train)
         mse_test = mean_squared_error(y_test[:, i], y_pred_test)
         r2_train = r2_score(y_train[:, i], y_pred_train)
@@ -165,6 +231,10 @@ def evaluate_models(
             avg_depth = int(np.mean([e.get_depth() for e in model.estimators_]))
             complexy = model.n_estimators * avg_depth
             equations = "N/A"
+        elif algorithm == "egGP":
+            best = model.results.iloc[-1]
+            complexy = best.size
+            equations = best.Expression
 
         # Exibe gráfico real X predito
         plt.subplots(figsize=(7, 7))
@@ -220,7 +290,11 @@ def rf_predict(model, X):
     return model.predict(X)
 
 
-def run_comparison(pysr=None, operon=False, rf=False):
+def eggp_predict(model, X):
+    return model.predict(X)
+
+
+def run_comparison(pysr=None, operon=False, rf=False, eggp=False):
     os.makedirs("results/compare_sr", exist_ok=True)
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
     output_path = os.path.join("results/compare_sr", f"results_{timestamp}.csv")
@@ -237,9 +311,9 @@ def run_comparison(pysr=None, operon=False, rf=False):
     X_train, X_test, y_train, y_test = train_test_split(
         X, y, test_size=0.3, random_state=4321
     )
-    scaler = StandardScaler()
-    X_train_scaled = scaler.fit_transform(X_train)
-    X_test_scaled = scaler.transform(X_test)
+    scaler_x = StandardScaler()
+    X_train_scaled = scaler_x.fit_transform(X_train)
+    X_test_scaled = scaler_x.transform(X_test)
     results_rows = []
 
     if rf:
@@ -282,6 +356,25 @@ def run_comparison(pysr=None, operon=False, rf=False):
         gerar_diagramas("Operon")
         combinar_fits("Operon")
 
+    if eggp:
+        print("\n Treinando egGP...")
+        eggp_models, elapsed = train_eggp_models(X_train_scaled, y_train, eggp_config)
+        results_rows.extend(
+            evaluate_models(
+                eggp_models,
+                eggp_predict,
+                X_train_scaled,
+                X_test_scaled,
+                y_train,
+                y_test,
+                "egGP",
+                targets,
+                elapsed,
+            )
+        )
+        gerar_diagramas("egGP")
+        combinar_fits("egGP")
+
     if pysr is not None:
         print("\n Treinando PySR...")
         if pysr == "train":
@@ -307,7 +400,7 @@ def run_comparison(pysr=None, operon=False, rf=False):
             gerar_diagramas("PySR")
             combinar_fits("PySR")
 
-    if rf or operon or (pysr is not None and pysr != "read"):
+    if rf or operon or eggp or (pysr is not None and pysr != "read"):
         df_results = pd.DataFrame(results_rows)
         df_results.to_csv(output_path, index=False)
         print("\nResultados salvos em:", output_path)
@@ -459,6 +552,24 @@ def combinar_fits(algorithm):
         os.remove(path) if os.path.exists(out_path) else None
 
 
+def avaliar_amostras(algo):
+    df = pd.read_csv("dados/ariel_limpo_log10.csv.gz", compression="gzip")
+    df_amostras = pd.read_csv(f"results/compare_sr/amostras_{algo}.csv")
+    features, targets = get_feature_target_names()
+    X = df[features].astype(float).values
+    y = df[targets].astype(float).values
+    _, _, _, y_test = train_test_split(X, y, test_size=0.3, random_state=4321)
+
+    for i, t in enumerate(targets):
+        mean = np.mean(y_test[:, i])
+        sqa = np.mean((y_test[:, i] - df_amostras[t]) ** 2)
+        sqt = np.mean((y_test[:, i] - mean) ** 2)
+        r2 = 1 - sqa / sqt
+        print(f"\n{t}:")
+        print(f"MSE: {sqa:.3f}")
+        print(f"R2: {r2:.3f}")
+
+
 if __name__ == "__main__":
     # histogramas_validation()
-    run_comparison(pysr="train", operon=True, rf=True)
+    run_comparison(pysr=None, operon=False, rf=False, eggp=True)
