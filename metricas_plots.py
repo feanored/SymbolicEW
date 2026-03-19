@@ -248,6 +248,13 @@ class PlotsMetricas(object):
     def treinar_operon(self, operon_config, X, y, plot=False):
         modelo = SymbolicRegressor(**operon_config)
         modelo.fit(X, y)
+        for model in modelo.pareto_front_:
+            model["r2"] = -model["objective_values"][0]  # R2 deve ser o primeiro!
+        best = min(
+            modelo.pareto_front_,
+            key=lambda x: x[modelo.model_selection_criterion],
+        )
+        modelo.stats_["model_r2"] = best["r2"]
         if plot:
             self.plot_entropy(modelo)
         return modelo
@@ -256,10 +263,10 @@ class PlotsMetricas(object):
         df_operon = self.process_metricas(pd.DataFrame(modelo.pareto_front_))
         self.plotly_entropy(df_operon)
 
-    # Calcula R2 e seleciona o modelo com o maior valor
+    # Seleciona o modelo com o maior R2
     def _operon_select_by_r2(self, operon):
         for model in operon.pareto_front_:
-            model["r2"] = -model["objective_values"][0]  # deve ser o primeiro!
+            model["r2"] = -model["objective_values"][0]  # R2 deve ser o primeiro!
         best = max(operon.pareto_front_, key=lambda x: x["r2"])
         operon.model_ = best["tree"]
         operon.stats_["model_r2"] = best["r2"]
