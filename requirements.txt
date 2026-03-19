@@ -50,7 +50,7 @@ jupyter_client==8.8.0
 jupyter_core==5.9.1
 jupyter_server==2.17.0
 jupyter_server_terminals==0.5.4
-jupyterlab==4.5.5
+jupyterlab==4.5.4
 jupyterlab_pygments==0.3.0
 jupyterlab_server==2.28.0
 jupyterlab_widgets==3.0.16
@@ -74,6 +74,7 @@ packaging==26.0
 pandas==2.3.3
 pandocfilters==1.5.1
 parso==0.8.6
+patsy==1.0.2
 pexpect==4.9.0
 pillow==12.1.1
 platformdirs==4.9.2
@@ -85,7 +86,7 @@ ptyprocess==0.7.0
 pure_eval==0.2.3
 pycparser==3.0
 Pygments==2.19.2
-pyoperon==0.5.0
+pyoperon==0.6.1
 pyparsing==3.3.2
 pysr==1.5.9
 python-dateutil==2.9.0.post0
@@ -109,6 +110,7 @@ six==1.17.0
 smplotlib==1.0.0
 soupsieve==2.8.3
 stack-data==0.6.3
+statsmodels==0.14.6
 sympy==1.14.0
 terminado==0.18.1
 threadpoolctl==3.6.0

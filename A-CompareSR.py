@@ -64,10 +64,7 @@ eggp_config = {
         "maxSize": 25,
         "nTournament": 5,
         "nonterminals": "add,sub,mul,div,square,exp,tanh",
-        "loss": "MSE",
-        "optIter": 50,
-        "optRepeat": 2,
-        "simplify": False,
+        "loss": "MSE"
     },
 }
 
@@ -296,8 +293,6 @@ def eggp_predict(model, X):
 
 def run_comparison(pysr=None, operon=False, rf=False, eggp=False):
     os.makedirs("results/compare_sr", exist_ok=True)
-    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-    output_path = os.path.join("results/compare_sr", f"results_{timestamp}.csv")
 
     print("\n Carregando dados...")
     df = pd.read_csv("dados/ariel_limpo_log10.csv.gz", compression="gzip")
@@ -402,6 +397,8 @@ def run_comparison(pysr=None, operon=False, rf=False, eggp=False):
 
     if rf or operon or eggp or (pysr is not None and pysr != "read"):
         df_results = pd.DataFrame(results_rows)
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        output_path = os.path.join("results/compare_sr", f"results_{timestamp}.csv")
         df_results.to_csv(output_path, index=False)
         print("\nResultados salvos em:", output_path)
     else:
@@ -572,4 +569,4 @@ def avaliar_amostras(algo):
 
 if __name__ == "__main__":
     # histogramas_validation()
-    run_comparison(pysr=None, operon=False, rf=False, eggp=True)
+    run_comparison(pysr='train', operon=True, rf=True, eggp=False)
