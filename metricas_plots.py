@@ -207,8 +207,8 @@ class PlotsMetricas(object):
             label="Desvio padrão por bin",
         )
         plt.title(r"Correlação entre bins e médias: $r_s = %.3f$" % corr)
-        plt.xlabel(col_x)
-        plt.ylabel(col_y)
+        plt.xlabel(self.unidades[col_x])
+        plt.ylabel(self.unidades[col_y])
         plt.legend()
         plt.show()
 
