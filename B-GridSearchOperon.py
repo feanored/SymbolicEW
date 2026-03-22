@@ -56,7 +56,10 @@ def gera_stats(dados_split, col_x):
     return stats_list
 
 
-def grid_search(col_x, SEED=4321, popsize=1000, gens=1000):
+def grid_search(col_x, SEED=4321, popsize=1000, select="by_bic"):
+    if select != "by_bic" and select != "by_r2":
+        raise ("Modo de seleção deve ser by_bic ou by_r2")
+
     # Faz o split e o agrupamento dos dados
     train, test = train_test_split(
         dados[[col_x] + larguras], test_size=0.3, random_state=4321
@@ -76,42 +79,36 @@ def grid_search(col_x, SEED=4321, popsize=1000, gens=1000):
 
     # Configuração do Operon
     hyper = {
-        "allowed_symbols": "add,sub,mul,aq,constant,variable,square,pow,abs,sqrt,exp,log,tanh",
+        "allowed_symbols": "add,sub,mul,aq,constant,variable,pow,exp,tanh",
         "random_state": SEED,
         "population_size": popsize,
-        "generations": gens,
-        "optimizer_iterations": 500,
-        "max_depth": 20,
-        "n_threads": 12,
+        "max_length": 25,
+        "max_depth": 25,
+        "optimizer_iterations": 100,
         "model_selection_criterion": "bayesian_information_criterion",
         "objectives": ["r2", "length"],
+        "n_threads": 12,
     }
 
-    print("\n[1/3] TREINANDO MODELOS DE MÉDIA")
-    print("-" * 80)
     for largura in larguras:
-        print(f"Treinando MÉDIA para {largura}...")
         y = train_por_bin[f"{largura}_mean"].values.astype(np.float64)
         modelo = p.treinar_operon(hyper, X_train_bins, y)
-        # p._operon_select_by_r2(modelo)
+        if select == "by_r2":
+            p._operon_select_by_r2(modelo)
         modelos[f"{largura}_mean"] = modelo
 
-    print("\n[2/3] TREINANDO MODELOS DE DESVIO PADRÃO")
-    print("-" * 80)
     for largura in larguras:
-        print(f"Treinando DESVIO PADRÃO para {largura}...")
         y = train_por_bin[f"{largura}_std"].values.astype(np.float64)
         modelo = p.treinar_operon(hyper, X_train_bins, y)
-        # p._operon_select_by_r2(modelo)
+        if select == "by_r2":
+            p._operon_select_by_r2(modelo)
         modelos[f"{largura}_std"] = modelo
 
-    print("\n[3/3] TREINANDO MODELOS DE COVARIÂNCIA")
-    print("-" * 80)
     for l1, l2 in cov_pairs:
-        print(f"Treinando COVARIÂNCIA para {l1} x {l2}...")
         y = train_por_bin[f"cov_{l1}_{l2}"].values.astype(np.float64)
         modelo = p.treinar_operon(hyper, X_train_bins, y)
-        # p._operon_select_by_r2(modelo)
+        if select == "by_r2":
+            p._operon_select_by_r2(modelo)
         modelos[f"cov_{l1}_{l2}"] = modelo
 
     metrics_data = []
@@ -138,6 +135,7 @@ def grid_search(col_x, SEED=4321, popsize=1000, gens=1000):
                 "Model": model_name,
                 "popsize": popsize,
                 "complexity": model.stats_["model_complexity"],
+                "bic": model.stats_["model_bic"],
                 "R2 Train": r2_train,
                 "MSE Train": mse_train,
                 "R2 Test": r2_test,
@@ -146,8 +144,8 @@ def grid_search(col_x, SEED=4321, popsize=1000, gens=1000):
         )
 
     df_metrics = pd.DataFrame(metrics_data)
-    df_metrics.to_csv(f"results/metrics_{col_x}_{popsize}.csv", index=False)
-    p.salva_equacoes_html(modelos, col_x, f"n4d_{col_x}_{popsize}")
+    csv_out = f"results/{select}/metrics_{col_x}_{popsize}.csv"
+    df_metrics.to_csv(csv_out, index=False)
 
 
 # ## Gerar Amostras do Conjunto de Teste com Normal Multivariada
@@ -333,8 +331,7 @@ def gerar_amostras(col_x, SEED=4321):
 
 # Busca pelo popsize ideal enquanto treina as funções-resumo
 def busca_equacoes():
-    pops = [100, 200, 300, 400, 500, 600, 700, 800, 900]
-    pops += [1000, 1500, 2000, 2500, 3000, 3500, 4000, 4500, 5000]
+    pops = [100, 200, 300, 400, 500, 600, 700, 800, 900, 1000]
     for pop in tqdm(pops):
         grid_search(F.azmass.value, popsize=pop)
         grid_search(F.atflux.value, popsize=pop)
@@ -348,4 +345,4 @@ def busca_amostras():
 
 ### MAIN
 if __name__ == "__main__":
-    busca_amostras()
+    busca_equacoes()

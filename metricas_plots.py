@@ -255,6 +255,7 @@ class PlotsMetricas(object):
             key=lambda x: x[modelo.model_selection_criterion],
         )
         modelo.stats_["model_r2"] = best["r2"]
+        modelo.stats_["model_bic"] = best["bayesian_information_criterion"]
         if plot:
             self.plot_entropy(modelo)
         return modelo
@@ -272,6 +273,7 @@ class PlotsMetricas(object):
         operon.stats_["model_r2"] = best["r2"]
         operon.stats_["model_length"] = best["length"]
         operon.stats_["model_complexity"] = best["complexity"]
+        operon.stats_["model_bic"] = best["bayesian_information_criterion"]
 
     # Selecionar modelo do Operon com a complexidade desejada
     def select_by_complexity(self, df_operon, complexity):
