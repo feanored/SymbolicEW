@@ -5,22 +5,22 @@ import matplotlib.pyplot as plt
 from metricas_plots import T
 
 
-def load_metrics_for_col(results_subfolder, col_x=""):
+def load_metrics_for_col(results_subfolder, col_x):
     csv_files = [
         f
         for f in os.listdir(results_subfolder)
         if f.startswith(f"metrics_{col_x}_") and f.endswith(".csv")
     ]
     if not csv_files:
-        df = pd.read_csv(f"metrics_{col_x}.csv")
-        if df.is_empty:
+        df = pd.read_csv(os.path.join(results_subfolder, f"metrics_{col_x}.csv"))
+        if df.empty:
             raise ("Não há métricas disponíveis!")
         return df
     dfs = [pd.read_csv(os.path.join(results_subfolder, f)) for f in csv_files]
     df = pd.concat(dfs, ignore_index=True)
-    df.to_csv(f"metrics_{col_x}.csv", index=False)
+    df.to_csv(os.path.join(results_subfolder, f"metrics_{col_x}.csv"), index=False)
     for csv in csv_files:
-        os.remove(csv)
+        os.remove(os.path.join(results_subfolder, csv))
     return df
 
 
@@ -221,7 +221,7 @@ def save_best_popsizes_by_bic(folder):
     # Extrai col_x únicos a partir dos nomes dos arquivos metrics_<col_x>_<popsize>.csv
     col_x_values = sorted(
         {
-            "_".join(f[len("metrics_") : -len(".csv")].split("_")[:-1])
+            "_".join(f[len("metrics") : -len(".csv")].split("_")[1:])
             for f in os.listdir(folder)
             if f.startswith("metrics_") and f.endswith(".csv")
         }
