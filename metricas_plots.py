@@ -1446,8 +1446,9 @@ class PlotsMetricas(object):
             for nome_modelo, modelo in modelos.items():
                 complexidade = modelo.stats_["model_complexity"]
                 r2_score = modelo.stats_["model_r2"]
+                bic_score = modelo.stats_["model_bic"]
                 f.write(f"<h3>{nome_modelo.upper()}</h3>\n")
-                f.write(f"<p>Complexidade: {complexidade} | R²: {r2_score:.4f}</p>\n")
+                f.write(f"<p>Complexidade: {complexidade} | R²: {r2_score:.4f} | BIC: {bic_score:.1f}</p>\n")
                 buf = StringIO()
                 with contextlib.redirect_stdout(buf):
                     self.mostrar_equacao(modelo, col_x)

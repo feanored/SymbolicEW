@@ -12,7 +12,6 @@ from metricas_plots import PlotsMetricas, T, F
 p = PlotsMetricas()
 larguras = p.targets[:4]
 dados = pd.read_csv("dados/ariel_limpo_log10.csv.gz", compression="gzip")
-modelos = {}  # Dicionário para armazenar os modelos treinados
 
 # Covariâncias (matriz triângular)
 cov_pairs = [
@@ -76,6 +75,8 @@ def grid_search(col_x, SEED=4321, popsize=1000, select="by_bic"):
     # Selecionar feature para o treinamento
     X_train_bins = train_por_bin[col_x].values.reshape(-1, 1).astype(np.float64)
     X_test_bins = test_por_bin[col_x].values.reshape(-1, 1).astype(np.float64)
+
+    modelos = {}  # Dicionário para armazenar os modelos treinados
 
     # Configuração do Operon
     hyper = {
@@ -148,18 +149,71 @@ def grid_search(col_x, SEED=4321, popsize=1000, select="by_bic"):
     df_metrics.to_csv(csv_out, index=False)
 
 
-# ## Gerar Amostras do Conjunto de Teste com Normal Multivariada
+### Gerar Amostras do Conjunto de Teste com Normal Multivariada
 def gerar_amostras(col_x, SEED=4321):
     # Faz o split e o agrupamento dos dados
     train, test = train_test_split(
         dados[[col_x] + larguras], test_size=0.3, random_state=4321
     )
+
+    # Cria subintervalos baseados em frequências (qcut)
+    train[f"{col_x}_mean"] = pd.qcut(train[col_x], 150)
+    test[f"{col_x}_mean"] = pd.qcut(test[col_x], 150)
+    train_por_bin = pd.DataFrame(gera_stats(train, col_x))
+
+    ### Treinar Operons para Média, Desvio Padrão e Covariâncias
+    df_metrics_bic = pd.read_csv(f"results/by_bic/best_popsizes_by_bic.csv")
+    modelos = {}
+
+    # Selecionar feature para o treinamento
+    X_train_bins = train_por_bin[col_x].values.reshape(-1, 1).astype(np.float64)
     X_test = test[[col_x]].astype(np.float64)
     n_samples = len(X_test)
 
-    print(
-        f"\nEstimando parâmetros de {n_samples} pontos do conjunto de validação para a Normal Multivariada..."
-    )
+    # Configuração do Operon
+    hyper = {
+        "random_state": 4321,
+        "population_size": 1000,
+        "allowed_symbols": "add,sub,mul,aq,constant,variable,pow,exp,tanh",
+        "max_length": 25,
+        "max_depth": 25,
+        "optimizer_iterations": 100,
+        "model_selection_criterion": "bayesian_information_criterion",
+        "objectives": ["r2", "length"],
+        "n_threads": 12,
+    }
+
+    for largura in larguras:
+        y = train_por_bin[f"{largura}_mean"].values.astype(np.float64)
+        df = df_metrics_bic.loc[
+            (df_metrics_bic["model"] == f"{largura}_mean")
+            & (df_metrics_bic["col_x"] == col_x)
+        ]
+        hyper["population_size"] = df["best_popsize"].values[0]
+        modelo = p.treinar_operon(hyper, X_train_bins, y)
+        modelos[f"{largura}_mean"] = modelo
+
+    for largura in larguras:
+        y = train_por_bin[f"{largura}_std"].values.astype(np.float64)
+        df = df_metrics_bic.loc[
+            (df_metrics_bic["model"] == f"{largura}_std")
+            & (df_metrics_bic["col_x"] == col_x)
+        ]
+        hyper["population_size"] = df["best_popsize"].values[0]
+        modelo = p.treinar_operon(hyper, X_train_bins, y)
+        modelos[f"{largura}_std"] = modelo
+
+    for l1, l2 in p.cov_pairs:
+        y = train_por_bin[f"cov_{l1}_{l2}"].values.astype(np.float64)
+        df = df_metrics_bic.loc[
+            (df_metrics_bic["model"] == f"cov_{l1}_{l2}")
+            & (df_metrics_bic["col_x"] == col_x)
+        ]
+        hyper["population_size"] = df["best_popsize"].values[0]
+        modelo = p.treinar_operon(hyper, X_train_bins, y)
+        modelos[f"cov_{l1}_{l2}"] = modelo
+
+    # Fazer predições dos estimadores
     means_all = np.column_stack(
         [modelos[f"{nome}_mean"].predict(X_test) for nome in larguras]
     )
@@ -169,16 +223,12 @@ def gerar_amostras(col_x, SEED=4321):
     covs_all = {}
     for l1, l2 in cov_pairs:
         covs_all[(l1, l2)] = modelos[f"cov_{l1}_{l2}"].predict(X_test)
-    print("Predições dos estimadores concluídas!")
 
     n_correcoes = 0
     amostras_multivariadas = np.zeros((n_samples, 4))
     idx_map = {nome: j for j, nome in enumerate(larguras)}
-    print("\nAmostragem multivariada iniciada..\n")
 
     for i in range(n_samples):
-        if i % 5000 == 0 and i > 0:
-            print(f"  Progresso: {i}/{n_samples} ({100*i/n_samples:.1f}%)")
 
         # Montar matriz de covariância
         mean_vector = means_all[i]
@@ -222,9 +272,6 @@ def gerar_amostras(col_x, SEED=4321):
             if not np.all(np.isfinite(cov_matrix)) or np.any(
                 eigenvalues < min_eigenval
             ):
-                print(
-                    "Abortando combinação problemática, desvios diagonais inválidos!\n"
-                )
                 corrigiu = False
                 n_samples -= 1
                 continue  # esquece e passa pra próxima combinação
@@ -247,34 +294,17 @@ def gerar_amostras(col_x, SEED=4321):
         larguras[3]: amostras_multivariadas[:, 3],
     }
 
-    print("\nAmostragem multivariada concluída!")
-    print(f"   - Amostras: {n_samples}")
-    print(
-        f"   - Matrizes corrigidas: {n_correcoes} ({100*n_correcoes/n_samples:.1f}%)\n"
-    )
+    # Salvando amostras em CSV
     df_amostras = pd.DataFrame(amostras)
-    df_amostras.to_csv(f"results/amostras_{col_x}_{SEED}.csv", index=False)
-
-    print(f"Estatísticas:\n")
-    for nome in larguras:
-        valores = df_amostras[nome]
-        print(
-            f"  {nome:12s}: média={valores.mean():7.3f}, std={valores.std():6.3f}, "
-            f"min={valores.min():7.3f}, max={valores.max():7.3f}"
-        )
-
     df_amostras = df_amostras.dropna()
     df_amostras = df_amostras.reset_index(drop=True)
+    df_amostras.to_csv(f"results/amostras_{col_x}_{SEED}.csv", index=False)
 
     # Calcular razões do BPT
     test[T.nii_ha.value] = test[T.nii.value].values - test[T.ha.value].values
     test[T.oiii_hb.value] = test[T.oiii.value].values - test[T.hb.value].values
     df_amostras[T.nii_ha.value] = df_amostras[T.nii.value] - df_amostras[T.ha.value]
     df_amostras[T.oiii_hb.value] = df_amostras[T.oiii.value] - df_amostras[T.hb.value]
-
-    # Verificar se as correlações foram preservadas
-    print("\nVERIFICAÇÃO: Correlações das amostras geradas")
-    print("=" * 80)
 
     # Matriz de correlação das amostras geradas
     corr_gerada = spearmanr(df_amostras[larguras]).correlation
@@ -289,24 +319,13 @@ def gerar_amostras(col_x, SEED=4321):
     diff_df = (df_corrger - df_corrtest).abs()
     diff = diff_df.values[np.triu_indices(4, k=1)].sum()
 
-    print("\nDiferença Absoluta - (Amostras - Teste):")
-    print(diff_df.round(3))
-    print(f"\nDiferença Absoluta: {diff:.4f}")
-    print("=" * 80)
-
-    fig, axes = plt.subplots(1, 2, figsize=(16, 6))
-    p.plot_corr(
-        corr_real,
-        axes[0],
-        larguras,
-        title="Matriz de correlação dos dados de teste",
-        type="inf",
-    )
+    fig, ax = plt.subplots(1, 1, figsize=(16, 6))
     p.plot_corr(
         corr_gerada,
-        axes[1],
+        ax,
         larguras,
-        title=r"Matriz de correlação das amostras normais, $\Delta$=%.4f" % diff,
+        title="Matriz de correlação das amostras normais\n"
+        + r"Correções: %.1f%%, $\Delta$=%.4f" % (100 * n_correcoes / n_samples, diff),
         type="inf",
     )
     fig.savefig(f"results/corr_{col_x}_{SEED}.png")
@@ -331,16 +350,21 @@ def gerar_amostras(col_x, SEED=4321):
 
 # Busca pelo popsize ideal enquanto treina as funções-resumo
 def busca_equacoes():
-    pops = [100, 200, 300, 400, 500, 600, 700, 800, 900, 1000]
-    for pop in tqdm(pops):
+    for pop in tqdm(range(100, 1001, 10)):
         grid_search(F.azmass.value, popsize=pop)
+    for pop in tqdm(range(100, 1001, 10)):
         grid_search(F.atflux.value, popsize=pop)
+    for pop in tqdm(range(100, 1001, 10)):
         grid_search(F.mass.value, popsize=pop)
 
 
 # Gera pontos amostrais das normais, com equações já escolhidas
 def busca_amostras():
-    pass
+    for _ in range(10):
+        seed = int(np.random.random() * 1e6)
+        gerar_amostras(F.azmass.value, seed)
+        gerar_amostras(F.atflux.value, seed)
+        gerar_amostras(F.mass.value, seed)
 
 
 ### MAIN
