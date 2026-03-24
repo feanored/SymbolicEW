@@ -354,7 +354,6 @@ class PlotsMetricas(object):
             ax_std.grid(True, alpha=0.3)
 
         plt.tight_layout()
-        plt.show()
 
     # Inspeção da qualidade dos modelos de covariância
     def inspecao_modelos_covs(self, modelos, dados_bins, col_x):
@@ -387,7 +386,6 @@ class PlotsMetricas(object):
             ax.grid(True, alpha=0.3)
 
         plt.tight_layout()
-        plt.show()
 
     # Definir treinamento do modelo conformal
     def conformal_regression(self, X_conform, y_conform, regressor, level=CONF_LEVEL):
@@ -1446,9 +1444,9 @@ class PlotsMetricas(object):
             for nome_modelo, modelo in modelos.items():
                 complexidade = modelo.stats_["model_complexity"]
                 r2_score = modelo.stats_["model_r2"]
-                bic_score = modelo.stats_["model_bic"]
+                bic_score = int(modelo.stats_["model_bic"])
                 f.write(f"<h3>{nome_modelo.upper()}</h3>\n")
-                f.write(f"<p>Complexidade: {complexidade} | R²: {r2_score:.4f} | BIC: {bic_score:.1f}</p>\n")
+                f.write(f"<p>Complexidade: {complexidade} | R²: {r2_score:.4f} | BIC: {bic_score}</p>\n")
                 buf = StringIO()
                 with contextlib.redirect_stdout(buf):
                     self.mostrar_equacao(modelo, col_x)
