@@ -118,11 +118,6 @@ def grid_search(col_x, SEED=4321, popsize=1000, select="by_bic"):
         y_train_pred = model.predict(X_train_bins)
         y_train_true = train_por_bin[model_name].values.astype(np.float64)
         mse_train = mean_squared_error(y_train_true, y_train_pred)
-        try:
-            r2_train = model.stats_["model_r2"]
-        except:
-            r2_train = r2_score(y_train_true, y_train_pred)
-            model.stats_["model_r2"] = r2_train
 
         # Predictions on test
         y_test_pred = model.predict(X_test_bins)
@@ -137,7 +132,7 @@ def grid_search(col_x, SEED=4321, popsize=1000, select="by_bic"):
                 "popsize": popsize,
                 "complexity": model.stats_["model_complexity"],
                 "bic": model.stats_["model_bic"],
-                "R2 Train": r2_train,
+                "R2 Train": model.stats_["model_r2"],
                 "MSE Train": mse_train,
                 "R2 Test": r2_test,
                 "MSE Test": mse_test,

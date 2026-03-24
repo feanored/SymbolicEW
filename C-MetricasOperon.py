@@ -260,13 +260,12 @@ if __name__ == "__main__":
     compare_folders("results/by_bic", "results/by_r2", "aZmass")
     compare_folders("results/by_bic", "results/by_r2", "mass")
 
+    # Evolução por popsize para um modelo específico
+    compare_model_by_popsizes("results/by_bic", "mass", T.oiii.value + "_mean")
+
     # Comparando todos os popsizes sobrepostos por modelo
     compare_popsizes_by_model("results/by_bic", "atflux")
     compare_popsizes_by_model("results/by_bic", "aZmass")
     compare_popsizes_by_model("results/by_bic", "mass")
     save_best_popsizes_by_bic("results/by_bic")
 
-    # Evolução por popsize para um modelo específico
-    compare_model_by_popsizes("results/by_bic", "atflux", T.oiii.value + "_mean")
-    compare_model_by_popsizes("results/by_bic", "aZmass", T.oiii.value + "_mean")
-    compare_model_by_popsizes("results/by_bic", "mass", T.oiii.value + "_mean")
