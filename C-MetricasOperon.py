@@ -1,4 +1,5 @@
 import os
+import numpy as np
 import pandas as pd
 import smplotlib  # type: ignore
 import matplotlib.pyplot as plt
@@ -100,7 +101,7 @@ def compare_popsizes_by_model(folder, col_x="", save_prefix="comp_popsizes"):
         ("bic", "BIC Validation Set"),
     ]
 
-    _, axes = plt.subplots(len(metrics), 1, figsize=(8, 4 * len(metrics)))
+    _, axes = plt.subplots(len(metrics), 1, figsize=(8, 18))
 
     # Determinar ordem dos modelos a partir da menor popsize disponível
     first_pop = sorted(df["popsize"].unique())[0]
@@ -109,11 +110,12 @@ def compare_popsizes_by_model(folder, col_x="", save_prefix="comp_popsizes"):
         model_order = sorted(df["Model"].unique())
 
     x = range(len(model_order))
+    idx = np.linspace(0, len(popsizes) - 1, 10, dtype=int)
 
     for row_idx, (metric_col, metric_label) in enumerate(metrics):
         ax = axes[row_idx]
 
-        for pop_idx, popsize in enumerate(popsizes):
+        for pop_idx, popsize in enumerate(np.array(popsizes)[idx]):
             df_pop = df[df["popsize"] == popsize].copy()
             if df_pop.empty:
                 continue
@@ -132,11 +134,8 @@ def compare_popsizes_by_model(folder, col_x="", save_prefix="comp_popsizes"):
             )
 
         ax.set_title(f"{metric_label}")
-        ax.set_xticks(list(x))
-        if row_idx == len(metrics) - 1:
-            ax.set_xticklabels(model_order, rotation=45, ha="right", fontsize=8)
-        else:
-            ax.set_xticklabels(["" for _ in x])
+        ax.set_xticks(x)
+        ax.set_xticklabels(model_order, rotation=45, ha="right", fontsize=8)
         if row_idx == 2:
             ax.legend(fontsize="small", loc="upper left")
 
@@ -177,12 +176,12 @@ def compare_model_by_popsizes(folder, col_x="", model=None):
 
     # popsizes comuns para alinhar eixo x
     popsizes = sorted(set(df["popsize"].unique()))
-    x_pos = range(len(popsizes))
+    idx = np.linspace(0, len(popsizes) - 1, 10, dtype=int)
 
     for row_idx, (metric_col, metric_label) in enumerate(metrics):
         ax = axes[row_idx]
 
-        for df, label, marker in [(df, metric_label, "o")]:
+        for df, label, marker in [(df, metric_label, "")]:
             df_grouped = (
                 df.groupby("popsize", as_index=False)
                 .mean(numeric_only=True)
@@ -191,20 +190,15 @@ def compare_model_by_popsizes(folder, col_x="", model=None):
                 .reindex(popsizes)
             )
             ax.plot(
-                list(x_pos),
+                popsizes,
                 df_grouped[metric_col].values,
                 marker=marker,
                 linestyle="-",
                 label=label,
             )
-
-        # ax.set_title(metric_label)
-        ax.set_xticks(list(x_pos))
-        if row_idx == len(metrics) - 1:
-            ax.set_xticklabels(popsizes, fontsize="medium")
-            ax.set_xlabel("popsize")
-        else:
-            ax.set_xticklabels(["" for _ in x_pos])
+        ax.set_xticks(np.array(popsizes)[idx])
+        ax.set_xticklabels(np.array(popsizes)[idx], fontsize="medium")
+        ax.set_xlabel("popsize")
         ax.legend()
 
     fig.suptitle(f'Modelo: {model} ~ {col_x or "all"}', fontsize="large", y=1.01)
@@ -239,8 +233,7 @@ def save_best_popsizes_by_bic(folder):
                 {
                     "col_x": col_x,
                     "model": model,
-                    "best_popsize": int(best_row["popsize"]),
-                    "bic": best_row["bic"],
+                    "popsize": int(best_row["popsize"]),
                 }
             )
 
@@ -268,4 +261,3 @@ if __name__ == "__main__":
     compare_popsizes_by_model("results/by_bic", "aZmass")
     compare_popsizes_by_model("results/by_bic", "mass")
     save_best_popsizes_by_bic("results/by_bic")
-
