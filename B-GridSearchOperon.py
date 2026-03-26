@@ -345,11 +345,11 @@ def gerar_amostras(col_x, SEED=4321):
 
 # Busca pelo popsize ideal enquanto treina as funções-resumo
 def busca_equacoes():
-    for pop in tqdm(range(100, 1001, 10)):
+    for pop in tqdm(range(100, 2001, 20)):
         grid_search(F.azmass.value, popsize=pop)
-    for pop in tqdm(range(100, 1001, 10)):
+    for pop in tqdm(range(100, 2001, 20)):
         grid_search(F.atflux.value, popsize=pop)
-    for pop in tqdm(range(100, 1001, 10)):
+    for pop in tqdm(range(100, 2001, 20)):
         grid_search(F.mass.value, popsize=pop)
 
 

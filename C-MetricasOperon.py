@@ -92,7 +92,7 @@ def compare_popsizes_by_model(folder, col_x="", save_prefix="comp_popsizes"):
         return
 
     popsizes = sorted(set(df["popsize"].unique()))
-    markers = ["o", "s", "^", "D", "v", "P", "*", "X", "h"]
+    # markers = ["o", "s", "^", "D", "v", "P", "*", "X", "h"]
     linestyles = ["-", "--", "-.", ":"]
 
     metrics = [
@@ -123,12 +123,12 @@ def compare_popsizes_by_model(folder, col_x="", save_prefix="comp_popsizes"):
                 df_pop = df_pop.groupby("Model", as_index=False).mean(numeric_only=True)
 
             df_pop = df_pop.set_index("Model").reindex(model_order)
-            marker = markers[pop_idx % len(markers)]
+            # marker = markers[pop_idx % len(markers)]
             ls = linestyles[pop_idx % len(linestyles)]
             ax.plot(
                 x,
                 df_pop[metric_col].values,
-                marker=marker,
+                marker="",
                 linestyle=ls,
                 label=f"pop={popsize}",
             )
