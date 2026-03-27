@@ -13,7 +13,6 @@ import plotly.io as pio
 from scipy import stats
 from scipy.special import gammaln
 from scipy.optimize import minimize
-from sklearn.preprocessing import StandardScaler
 from sklearn.linear_model import QuantileRegressor
 from sklearn.model_selection import train_test_split
 from sklearn.metrics import mean_squared_error, r2_score
@@ -83,8 +82,8 @@ class PlotsMetricas(object):
         return self.targets
 
     def setUnidades(self):
-        self.unidades[T.nii.value] = r"$ \log EW([NII]6584) $"
-        self.unidades[T.oiii.value] = r"$ \log EW([OIII]5007) $"
+        self.unidades[T.nii.value] = r"$ \log EW([NII]\lambda 6584) $"
+        self.unidades[T.oiii.value] = r"$ \log EW([OIII]\lambda 5007) $"
         self.unidades[T.ha.value] = r"$ \log EW(H\alpha) $"
         self.unidades[T.hb.value] = r"$ \log EW(H\beta) $"
         self.unidades[F.atflux.value] = r"$ \log t_{\text{flux}} $"
@@ -918,13 +917,23 @@ class PlotsMetricas(object):
         plt.ylabel(y.name)
         plt.show()
 
-    def histogram_v(self, dados, title, ax, density=True, lim=None, cor=None, bins=100):
-        ax.set_xlabel("Value")
-        ax.set_ylabel("Density")
+    def histogram_v(
+        self, dados, title, ax, bins, density=True, lim=None, cor=None, lbl=""
+    ):
+        ax.set_xlabel("Value", fontsize="x-large")
+        ax.set_ylabel("Density", fontsize="x-large")
         if lim is not None:
             ax.set_xlim(lim)
-        ax.hist(dados.astype("float"), bins=bins, density=density, color=cor)
-        ax.set_title(title)
+        ax.hist(
+            dados.astype("float"),
+            bins=bins,
+            density=density,
+            color=cor,
+            label=lbl,
+            alpha=0.5,
+        )
+        ax.set_title(title, fontsize="xx-large")
+        ax.legend(fontsize="x-large")
 
     def histogram_h(self, dados, title, density=False, lim=None, cor=None, bins=100):
         plt.subplots(figsize=(5 * self.phi, 5))
@@ -936,6 +945,15 @@ class PlotsMetricas(object):
         plt.tight_layout()
         plt.title(title)
         plt.show()
+
+    def calcula_kl(self, reais, amostras, col, bins):
+        eps = 1e-9
+        p_counts, _ = np.histogram(reais[col], bins=bins)
+        q_counts, _ = np.histogram(amostras[col], bins=bins)
+        p = p_counts / p_counts.sum() + eps
+        q = q_counts / q_counts.sum() + eps
+        kl = np.sum(p * np.log(p / q))
+        return kl
 
     def filtra_median(self, df_median, filtro):
         df_median = df_median[
@@ -1442,11 +1460,11 @@ class PlotsMetricas(object):
                 "<h1>Equações dos modelos Operon para os estimadores da Normal</h1>\n"
             )
             for nome_modelo, modelo in modelos.items():
-                complexidade = modelo.stats_["model_complexity"]
+                complexy = modelo.stats_["model_complexity"]
                 r2_score = modelo.stats_["model_r2"]
                 bic_score = int(modelo.stats_["model_bic"])
                 f.write(f"<h3>{nome_modelo.upper()}</h3>\n")
-                f.write(f"<p>Complexidade: {complexidade} | R²: {r2_score:.4f} | BIC: {bic_score}</p>\n")
+                f.write(f"<p>Complexidade: {complexy} | R²: {r2_score:.4f} | BIC: {bic_score}</p>\n")
                 buf = StringIO()
                 with contextlib.redirect_stdout(buf):
                     self.mostrar_equacao(modelo, col_x)
