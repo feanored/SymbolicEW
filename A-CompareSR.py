@@ -64,7 +64,7 @@ eggp_config = {
         "maxSize": 25,
         "nTournament": 5,
         "nonterminals": "add,sub,mul,div,square,exp,tanh",
-        "loss": "MSE"
+        "loss": "MSE",
     },
 }
 
@@ -407,44 +407,19 @@ def run_comparison(pysr=None, operon=False, rf=False, eggp=False):
 
 def histogramas_validation():
     # Histogramas do conjunto de validação
-    df = pd.read_csv("dados/ariel_limpo_log10.csv.gz", compression="gzip")
     features, targets = get_feature_target_names()
-    X = df[features].astype(float).values
-    y = df[targets].astype(float).values
-    _, _, _, y_test = train_test_split(X, y, test_size=0.3, random_state=4321)
-    _, ax = plt.subplots(2, 2, figsize=(16, 12))
-    p.histogram_v(
-        y_test[:, 0],
-        "Validation Set for " + p.unidades[targets[0]],
-        ax[0, 0],
-        cor="darkblue",
-        bins=80,
-        lim=(-1, 2.5),
-    )
-    p.histogram_v(
-        y_test[:, 1],
-        "Validation Set for " + p.unidades[targets[1]],
-        ax[0, 1],
-        cor="darkblue",
-        bins=80,
-        lim=(-1, 2.5),
-    )
-    p.histogram_v(
-        y_test[:, 2],
-        "Validation Set for " + p.unidades[targets[2]],
-        ax[1, 0],
-        cor="darkblue",
-        bins=80,
-        lim=(-1, 2.5),
-    )
-    p.histogram_v(
-        y_test[:, 3],
-        "Validation Set for " + p.unidades[targets[3]],
-        ax[1, 1],
-        cor="darkblue",
-        bins=80,
-        lim=(-1, 2.5),
-    )
+    df = pd.read_csv("dados/ariel_limpo_log10.csv.gz", compression="gzip")
+    _, y_test = train_test_split(df[features + targets], test_size=0.3, random_state=4321)
+    _, axs = plt.subplots(2, 2, figsize=(16, 12))
+    bins = np.linspace(-1, 2.5, 80)
+    for i, t in enumerate(targets):
+        ax = axs[i // 2][i % 2]
+        p.histogram_v(
+            y_test[t], "Validation Set for " + p.unidades[t],
+            ax, bins=bins, lim=(-1, 2.5),
+            cor="darkblue",
+        )
+    plt.tight_layout()
     plt.savefig(f"results/compare_sr/histogram_validation.png")
     plt.close()
 
@@ -470,46 +445,43 @@ def gerar_diagramas(algo):
         for target in targets:
             os.remove(f"results/compare_sr/amostras_{algo}_{target}.csv")
     except:
-        print(f"Ocorreu um erro ao juntar as amostras do {algo}!")
+        print(f"Lendo as amostras salvas do {algo}!")
         try:
             df_amostras = pd.read_csv(f"results/compare_sr/amostras_{algo}.csv")
         except:
             return
 
-    # Histogramas
-    _, ax = plt.subplots(2, 2, figsize=(16, 12))
-    p.histogram_v(
-        df_amostras[T.nii.value],
-        f"{algo} Sample for " + p.unidades[T.nii.value],
-        ax[0, 0],
-        cor="darkgreen",
-        bins=80,
-        lim=(-1, 2.5),
+    # Histogramas do conjunto de validação
+    df = pd.read_csv("dados/ariel_limpo_log10.csv.gz", compression="gzip")
+    features, targets = get_feature_target_names()
+    _, y_test = train_test_split(df[features + targets], test_size=0.3, random_state=4321)
+
+    # Calcula divergência KL entre amostras e o conjunto observado
+    bins = np.linspace(-1, 2.5, 80)
+    kl_values = [p.calcula_kl(y_test, df_amostras, t, bins) for t in targets]
+
+    # Gráficos
+    fig, axs = plt.subplots(2, 2, figsize=(16, 12))
+    plt.suptitle(
+        "Distribuição das estimativas feitas pelo algoritmo " + algo,
+        fontsize="xx-large",
     )
-    p.histogram_v(
-        df_amostras[T.ha.value],
-        f"{algo} Sample for " + p.unidades[T.ha.value],
-        ax[0, 1],
-        cor="darkgreen",
-        bins=80,
-        lim=(-1, 2.5),
-    )
-    p.histogram_v(
-        df_amostras[T.oiii.value],
-        f"{algo} Sample for " + p.unidades[T.oiii.value],
-        ax[1, 0],
-        cor="darkgreen",
-        bins=80,
-        lim=(-1, 2.5),
-    )
-    p.histogram_v(
-        df_amostras[T.hb.value],
-        f"{algo} Sample for " + p.unidades[T.hb.value],
-        ax[1, 1],
-        cor="darkgreen",
-        bins=80,
-        lim=(-1, 2.5),
-    )
+
+    for i, (t, kl) in enumerate(zip(targets, kl_values)):
+        ax = axs[i // 2][i % 2]
+        p.histogram_v(
+            y_test[t],
+            "", ax, bins=bins, lim=(-1, 2.5),
+            cor="darkblue", lbl="Test Set",
+        )
+        p.histogram_v(
+            df_amostras[t],
+            r"%s, $D_{KL}$ = %.4f" % (p.unidades[t], kl),
+            ax, bins=bins, lim=(-1, 2.5),
+            cor="lightgreen", lbl="Sample",
+        )
+
+    plt.tight_layout()
     plt.savefig(f"results/compare_sr/histogram_{algo}.png")
     plt.close()
 
@@ -569,4 +541,4 @@ def avaliar_amostras(algo):
 
 if __name__ == "__main__":
     # histogramas_validation()
-    run_comparison(pysr='train', operon=True, rf=True, eggp=False)
+    run_comparison(pysr="train", operon=True, rf=True, eggp=False)

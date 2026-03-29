@@ -288,7 +288,7 @@ class PlotsMetricas(object):
     def mostrar_equacao(self, operon, col_x, formato="texto"):
         # print("Complexity: %d"%complexity)
         equation_str = operon.get_model_string(
-            operon.model_, names=[col_x], precision=6
+            operon.model_, names=col_x, precision=6
         )
         eq_latex = sp.latex(equation_str)
 
