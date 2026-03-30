@@ -461,11 +461,7 @@ def gerar_diagramas(algo):
     kl_values = [p.calcula_kl(y_test, df_amostras, t, bins) for t in targets]
 
     # Gráficos
-    fig, axs = plt.subplots(2, 2, figsize=(16, 12))
-    plt.suptitle(
-        "Distribuição das estimativas feitas pelo algoritmo " + algo,
-        fontsize="xx-large",
-    )
+    _, axs = plt.subplots(2, 2, figsize=(16, 12))
 
     for i, (t, kl) in enumerate(zip(targets, kl_values)):
         ax = axs[i // 2][i % 2]
@@ -498,8 +494,7 @@ def combinar_fits(algorithm):
     from PIL import Image
 
     _, targets = get_feature_target_names()
-    # targets = [nii, ha, oiii, hb] → layout 2x2 já na ordem correta
-    ordem = [targets[0], targets[1], targets[2], targets[3]]  # nii, ha, oiii, hb
+    ordem = [targets[0], targets[1], targets[2], targets[3]]
 
     imgs = []
     for target in ordem:

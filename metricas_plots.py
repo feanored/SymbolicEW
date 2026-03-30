@@ -203,11 +203,57 @@ class PlotsMetricas(object):
             medias + stds,
             alpha=0.3,
             color="red",
-            label="Desvio padrão por bin",
+            label=r"$\pm 1 \sigma$ por bin",
         )
         plt.title(r"Correlação entre bins e médias: $r_s = %.3f$" % corr)
         plt.xlabel(self.unidades[col_x])
         plt.ylabel(self.unidades[col_y])
+        plt.legend()
+        plt.show()
+
+    # Exibir alguma função treinada de interesse
+    def plot_medias_estimadas(self, dados, modelos, dados_bins, col_x, col_y):
+        centers = dados_bins[col_x].values.flatten()
+        medias = dados_bins[f"{col_y}_mean"].values
+        stds = dados_bins[f"{col_y}_std"].values
+
+        X = np.linspace(dados[col_x].min(), dados[col_x].max(), 500)
+        medias_s = modelos[f"{col_y}_mean"].predict(X.reshape(-1, 1))
+        stds_s = modelos[f"{col_y}_std"].predict(X.reshape(-1, 1))
+        
+        medias_corr = modelos[f"{col_y}_mean"].predict(centers.reshape(-1, 1))
+        corr_s, _ = stats.spearmanr(medias, medias_corr)
+
+        plt.subplots(figsize=(5 * self.phi, 5))
+        plt.scatter(
+            dados[col_x], dados[col_y], alpha=0.5, color="gray", s=2, edgecolors="none"
+        )
+
+        plt.plot(centers, medias, "k-", linewidth=1.5, label="Média real", color="blue")
+        plt.plot(X, medias_s, "k-", linewidth=1.5, label="Média estimada")
+
+        plt.fill_between(
+            centers,
+            medias - stds,
+            medias + stds,
+            alpha=0.4,
+            color="red",
+            label=r"$\pm 1 \sigma$ real",
+        )
+        plt.fill_between(
+            X,
+            medias_s - stds_s,
+            medias_s + stds_s,
+            alpha=0.3,
+            color="orange",
+            label=r"$\pm 1 \sigma$ estimado",
+        )
+        plt.title(
+            r"Correlação entre médias reais e as estimadas: $r_s = %.3f$" % corr_s
+        )
+        plt.xlabel(self.unidades[col_x])
+        plt.ylabel(self.unidades[col_y])
+        plt.ylim(medias.min() - 2 * stds.max(), medias.max() + 2 * stds.max())
         plt.legend()
         plt.show()
 
@@ -287,9 +333,7 @@ class PlotsMetricas(object):
     # Mostra a equação de um modelo do pyoperon.
     def mostrar_equacao(self, operon, col_x, formato="texto"):
         # print("Complexity: %d"%complexity)
-        equation_str = operon.get_model_string(
-            operon.model_, names=col_x, precision=6
-        )
+        equation_str = operon.get_model_string(operon.model_, names=col_x, precision=6)
         eq_latex = sp.latex(equation_str)
 
         if formato == "jupyter":
@@ -503,7 +547,7 @@ class PlotsMetricas(object):
             cbar.set_label(color, rotation=90, labelpad=2)
         if densities:
             self.curvas_densidade(dados[T.nii_ha.value], dados[T.oiii_hb.value])
-        self.bpt_config("Diagrama BPT: %s" % title)
+        self.bpt_config("Diagrama BPT: %s" % title, "EW ")
         if show:
             plt.show()
 
@@ -540,7 +584,7 @@ class PlotsMetricas(object):
             cbar.set_label(color, rotation=90, labelpad=2)
         if densities:
             self.curvas_densidade(dados[T.nii_ha.value], dados[T.ha.value])
-        self.whan_config("Diagrama WHAN: %s" % title)
+        self.whan_config("Diagrama WHAN: %s" % title, "EW ")
         if show:
             plt.show()
 
@@ -1464,7 +1508,9 @@ class PlotsMetricas(object):
                 r2_score = modelo.stats_["model_r2"]
                 bic_score = int(modelo.stats_["model_bic"])
                 f.write(f"<h3>{nome_modelo.upper()}</h3>\n")
-                f.write(f"<p>Complexidade: {complexy} | R²: {r2_score:.4f} | BIC: {bic_score}</p>\n")
+                f.write(
+                    f"<p>Complexidade: {complexy} | R²: {r2_score:.4f} | BIC: {bic_score}</p>\n"
+                )
                 buf = StringIO()
                 with contextlib.redirect_stdout(buf):
                     self.mostrar_equacao(modelo, col_x)
@@ -1747,7 +1793,7 @@ class PlotsMetricas(object):
         self.plot_KeKa06()  # linhas de separação teóricas
         plt.title(titulo, fontsize="x-large")
         plt.xlabel(r"$log_{10}$(%s[NII] / %sH$\alpha$)" % (sfx, sfx), fontsize="large")
-        plt.ylabel(r"$log_{10}$EW H$\alpha$)", fontsize="large")
+        plt.ylabel(r"$log_{10}$(EW H$\alpha$)", fontsize="large")
         plt.xticks(fontsize="medium")
         plt.yticks(fontsize="medium")
         plt.xlim(-2, 1)
@@ -1779,7 +1825,7 @@ class PlotsMetricas(object):
         self.plot_KeKa()  # Linhas de separação teóricas
         plt.xlabel(r"$log_{10}$(%s[NII] / %sH$\alpha$)" % (sfx, sfx), fontsize="large")
         plt.ylabel(r"$log_{10}$(%s[OIII] / %sH$\beta$)" % (sfx, sfx), fontsize="large")
-        plt.title(title)
+        plt.title(title, fontsize="x-large")
         plt.xlim(-2, 1)
         plt.ylim(-1.5, 1.4)
         plt.grid(True, alpha=0.2)
