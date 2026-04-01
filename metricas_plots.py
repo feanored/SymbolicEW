@@ -1,3 +1,4 @@
+import pickle
 import numpy as np
 import sympy as sp
 import pandas as pd
@@ -208,6 +209,7 @@ class PlotsMetricas(object):
         plt.title(r"Correlação entre bins e médias: $r_s = %.3f$" % corr)
         plt.xlabel(self.unidades[col_x])
         plt.ylabel(self.unidades[col_y])
+        plt.ylim(medias.min() - 2 * stds.max(), medias.max() + 2 * stds.max())
         plt.legend()
         plt.show()
 
@@ -2059,3 +2061,20 @@ class PlotsMetricas(object):
         plt.tight_layout()
         plt.legend()
         plt.show()
+
+    def save_operon(self, modelo, nome):
+        try:
+            out = open('results/operon/%s.pkl'%(nome), 'wb')
+            pickle.dump(modelo, out)
+            out.close()
+        except:
+            print("Ocorreu um erro ao salvar o modelo Operon do %s"%nome)
+
+    def load_operon(self, nome):
+        try:
+            m_file = open('results/operon/%s.pkl'%(nome), 'rb')
+            modelo = pickle.load(m_file)
+            m_file.close()
+        except:
+            modelo = None
+        return modelo
