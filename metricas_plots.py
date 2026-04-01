@@ -353,7 +353,12 @@ class PlotsMetricas(object):
 
     # Gráficos da qualidade do ajuste das médias e desvios-padrão
     def inspecao_modelos(self, modelos, dados_bins, col_x):
-        X_bins = dados_bins[col_x].values.reshape(-1, 1)
+        if type(col_x) is list:
+            X_bins = dados_bins[col_x]
+        elif type(col_x) is str:
+            X_bins = dados_bins[col_x].values.reshape(-1, 1)
+        else:
+            raise("Mandou um objeto inválido, filho!")
         fig, axes = plt.subplots(4, 2, figsize=(12, 14))
         fig.suptitle(
             "Qualidade dos Modelos Operon para Médias e Desvios-padrão: Predições vs Valores Reais",
@@ -403,7 +408,12 @@ class PlotsMetricas(object):
 
     # Gráficos da qualidade do ajuste das covariâncias
     def inspecao_modelos_covs(self, modelos, dados_bins, col_x):
-        X_bins = dados_bins[col_x].values.reshape(-1, 1)
+        if type(col_x) is list:
+            X_bins = dados_bins[col_x]
+        elif type(col_x) is str:
+            X_bins = dados_bins[col_x].values.reshape(-1, 1)
+        else:
+            raise("Mandou um objeto inválido, filho!")
         fig, axes = plt.subplots(3, 2, figsize=(12, 10.5))
         fig.suptitle(
             "Qualidade dos Modelos Operon para Covariâncias: Predições vs Valores Reais",
