@@ -17,6 +17,7 @@ from scipy.optimize import minimize
 from sklearn.linear_model import QuantileRegressor
 from sklearn.model_selection import train_test_split
 from sklearn.metrics import mean_squared_error, r2_score
+import pyoperon.pyoperon as op
 from pyoperon.sklearn import SymbolicRegressor
 from mapie.metrics.regression import regression_coverage_score
 from mapie.regression import SplitConformalRegressor
@@ -222,7 +223,7 @@ class PlotsMetricas(object):
         X = np.linspace(dados[col_x].min(), dados[col_x].max(), 500)
         medias_s = modelos[f"{col_y}_mean"].predict(X.reshape(-1, 1))
         stds_s = modelos[f"{col_y}_std"].predict(X.reshape(-1, 1))
-        
+
         medias_corr = modelos[f"{col_y}_mean"].predict(centers.reshape(-1, 1))
         corr_s, _ = stats.spearmanr(medias, medias_corr)
 
@@ -257,7 +258,6 @@ class PlotsMetricas(object):
         plt.ylabel(self.unidades[col_y])
         plt.ylim(medias.min() - 2 * stds.max(), medias.max() + 2 * stds.max())
         plt.legend()
-        plt.show()
 
     # Definir treinamento do modelo simbólico
     def operon_regression(
@@ -305,7 +305,8 @@ class PlotsMetricas(object):
         modelo.stats_["model_bic"] = best["bayesian_information_criterion"]
         if plot:
             self.plot_entropy(modelo)
-        return modelo
+        wrapper = OperonModelWrapper(modelo)
+        return wrapper
 
     def plot_entropy(self, modelo):
         df_operon = self.process_metricas(pd.DataFrame(modelo.pareto_front_))
@@ -350,7 +351,7 @@ class PlotsMetricas(object):
         else:
             raise ValueError("formato deve ser 'jupyter', 'latex' ou 'texto'")
 
-    # Valores do conjunto de validação
+    # Gráficos da qualidade do ajuste das médias e desvios-padrão
     def inspecao_modelos(self, modelos, dados_bins, col_x):
         X_bins = dados_bins[col_x].values.reshape(-1, 1)
         fig, axes = plt.subplots(4, 2, figsize=(12, 14))
@@ -365,7 +366,7 @@ class PlotsMetricas(object):
             ax_mean = axes[idx, 0]
             y_true_mean = dados_bins[f"{linha}_mean"].values
             y_pred_mean = modelos[f"{linha}_mean"].predict(X_bins)
-            r2_mean = modelos[f"{linha}_mean"].score(X_bins, y_true_mean)
+            r2_mean = r2_score(y_pred_mean, y_true_mean)
             ax_mean.plot(
                 [y_true_mean.min(), y_true_mean.max()],
                 [y_true_mean.min(), y_true_mean.max()],
@@ -384,7 +385,7 @@ class PlotsMetricas(object):
             ax_std = axes[idx, 1]
             y_true_std = dados_bins[f"{linha}_std"].values
             y_pred_std = modelos[f"{linha}_std"].predict(X_bins)
-            r2_std = modelos[f"{linha}_std"].score(X_bins, y_true_std)
+            r2_std = r2_score(y_pred_std, y_true_std)
             ax_std.plot(
                 [y_true_std.min(), y_true_std.max()],
                 [y_true_std.min(), y_true_std.max()],
@@ -400,7 +401,7 @@ class PlotsMetricas(object):
 
         plt.tight_layout()
 
-    # Inspeção da qualidade dos modelos de covariância
+    # Gráficos da qualidade do ajuste das covariâncias
     def inspecao_modelos_covs(self, modelos, dados_bins, col_x):
         X_bins = dados_bins[col_x].values.reshape(-1, 1)
         fig, axes = plt.subplots(3, 2, figsize=(12, 10.5))
@@ -416,7 +417,7 @@ class PlotsMetricas(object):
             #  Covariâncias
             y_true_cov = dados_bins[f"cov_{l1}_{l2}"].values
             y_pred_cov = modelos[f"cov_{l1}_{l2}"].predict(X_bins)
-            r2_cov = modelos[f"cov_{l1}_{l2}"].score(X_bins, y_true_cov)
+            r2_cov = r2_score(y_pred_cov, y_true_cov)
 
             ax.scatter(y_true_cov, y_pred_cov, alpha=0.75, s=20, color="purple")
             ax.plot(
@@ -1515,7 +1516,8 @@ class PlotsMetricas(object):
                 )
                 buf = StringIO()
                 with contextlib.redirect_stdout(buf):
-                    self.mostrar_equacao(modelo, col_x)
+                    # self.mostrar_equacao(modelo, col_x)
+                    print(f"Equação: \n{modelo.expression}")
                 eq_text = buf.getvalue()
                 eq_html = (
                     eq_text.replace("&", "&amp;")
@@ -2064,17 +2066,58 @@ class PlotsMetricas(object):
 
     def save_operon(self, modelo, nome):
         try:
-            out = open('results/operon/%s.pkl'%(nome), 'wb')
+            out = open("results/operon/%s.pkl" % (nome), "wb")
             pickle.dump(modelo, out)
             out.close()
-        except:
-            print("Ocorreu um erro ao salvar o modelo Operon do %s"%nome)
+        except Exception as e:
+            print("Ocorreu um erro ao salvar o modelo Operon do %s: \n" % nome)
+            print(e)
+            print("\n")
 
     def load_operon(self, nome):
         try:
-            m_file = open('results/operon/%s.pkl'%(nome), 'rb')
+            m_file = open("results/operon/%s.pkl" % (nome), "rb")
             modelo = pickle.load(m_file)
             m_file.close()
         except:
             modelo = None
         return modelo
+
+
+# --------------------------------------------------------------------------------------------------
+class OperonModelWrapper:
+    def __init__(self, operon):
+        self.coefficients = np.array(operon.model_.GetCoefficients())
+        self.expression   = operon.get_model_string(operon.model_, precision=6)
+        self._nodes       = list(operon.model_.Nodes)
+        self.stats_       = operon.stats_
+
+    def _rebuild_model(self):
+        """Reconstrói o objeto Tree a partir dos nós serializados."""
+        tree = op.Tree(self._nodes)
+        tree.UpdateNodes()
+        tree.SetCoefficients(np.array(self.coefficients, dtype=np.float32))
+        return tree
+
+    def predict(self, X):
+        tree = self._rebuild_model()
+        model = SymbolicRegressor()
+        model.model_ = tree
+        return model.predict(X)
+
+    def __getstate__(self):
+        state = self.__dict__.copy()
+        return state
+
+    def __setstate__(self, state):
+        self.__dict__.update(state)
+
+    def __repr__(self):
+        return (
+            f"OperonModelWrapper(\n"
+            f"  expression = {self.expression}\n"
+            f"  complexity = {self.stats_["model_complexity"]}\n"
+            f"  r2         = {self.stats_["model_r2"]:.4f}\n"
+            f"  bic       = {self.stats_["model_bic"]:.0f}\n"
+            f")"
+        )
