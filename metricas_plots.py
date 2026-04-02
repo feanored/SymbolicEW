@@ -1514,7 +1514,7 @@ class PlotsMetricas(object):
             f.write("</style>\n")
             f.write("</head><body>\n")
             f.write(
-                "<h1>Equações dos modelos Operon para os estimadores da Normal</h1>\n"
+                "<h1>Equacoes dos modelos Operon para os estimadores da Normal</h1>\n"
             )
             for nome_modelo, modelo in modelos.items():
                 complexy = modelo.stats_["model_complexity"]
@@ -1522,12 +1522,12 @@ class PlotsMetricas(object):
                 bic_score = int(modelo.stats_["model_bic"])
                 f.write(f"<h3>{nome_modelo.upper()}</h3>\n")
                 f.write(
-                    f"<p>Complexidade: {complexy} | R²: {r2_score:.4f} | BIC: {bic_score}</p>\n"
+                    f"<p>Complexidade: {complexy} | R2: {r2_score:.4f} | BIC: {bic_score}</p>\n"
                 )
                 buf = StringIO()
                 with contextlib.redirect_stdout(buf):
                     # self.mostrar_equacao(modelo, col_x)
-                    print(f"Equação: \n{modelo.expression}")
+                    print(f"Equacao: \n{modelo.expression}")
                 eq_text = buf.getvalue()
                 eq_html = (
                     eq_text.replace("&", "&amp;")
