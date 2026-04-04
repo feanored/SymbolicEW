@@ -1478,6 +1478,7 @@ class PlotsMetricas(object):
                 f"<tr>\
                 <th>Modelo</th>\
                 <th>Complex</th>\
+                <th>MSE</th>\
                 <th>R2</th>\
                 <th>BIC</th>\
                 <th>Equacao</th>\
@@ -1486,12 +1487,13 @@ class PlotsMetricas(object):
             for nome_modelo, modelo in modelos.items():
                 f.write("<tr>\n")
                 complexy = modelo.stats_["model_complexity"]
-                # mse_score = modelo.stats_["model_mse"]
+                mse_score = modelo.stats_["model_mse"]
                 r2_score = modelo.stats_["model_r2"]
                 bic_score = int(modelo.stats_["model_bic"])
                 f.write(f"<td>{nome_modelo.upper()}</td>\n")
                 f.write(
                     f"<td>{complexy}</td>\
+                    <td>{mse_score:.3e}</td>\
                     <td>{r2_score:.4f}</td>\
                     <td>{bic_score}</td>\n"
                 )
