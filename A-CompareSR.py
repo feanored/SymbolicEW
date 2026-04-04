@@ -108,7 +108,7 @@ def train_operon_models(X_train, y_train, config):
 
 
 def train_pysr_models(X_train, y_train, config):
-    from pysr import PySRRegressor
+    from pysr import PySRRegressor # type: ignore
 
     pysr_kwargs = config["kwargs"]
     models = []
@@ -129,7 +129,7 @@ def train_pysr_models(X_train, y_train, config):
 
 
 def read_pysr_models(config, targets, prefix=""):
-    from pysr import PySRRegressor
+    from pysr import PySRRegressor # type: ignore
 
     models = []
     elapseds = []
@@ -170,7 +170,7 @@ def split_random_stratified(X, y, n_bins=10, random_state=4321):
 
 
 def train_eggp_models(X_train, y_train, config):
-    from eggp import EGGP
+    from eggp import EGGP # type: ignore
 
     models = []
     elapseds = []

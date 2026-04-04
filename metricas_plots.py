@@ -16,7 +16,6 @@ from scipy.special import gammaln
 from scipy.optimize import minimize
 from sklearn.linear_model import QuantileRegressor
 from sklearn.model_selection import train_test_split
-from sklearn.metrics import mean_squared_error, r2_score
 import pyoperon.pyoperon as op
 from pyoperon.sklearn import SymbolicRegressor
 from mapie.metrics.regression import regression_coverage_score
@@ -29,7 +28,7 @@ warnings.filterwarnings("ignore")
 # Modelos de regressão simbólica utilizados
 # https://astroautomata.com/PySR/v1.5.9/api.html
 # pip install pysr==1.5.9
-# pip install pyoperon==0.5.0
+# pip install pyoperon==0.6.1
 
 # --------------------------------------------------------------------------------------------------
 # Definindo constantes úteis
@@ -302,6 +301,7 @@ class PlotsMetricas(object):
             key=lambda x: x[modelo.model_selection_criterion],
         )
         modelo.stats_["model_r2"] = best["r2"]
+        modelo.stats_["model_mse"] = best["mean_squared_error"]
         modelo.stats_["model_bic"] = best["bayesian_information_criterion"]
         if plot:
             self.plot_entropy(modelo)
@@ -319,8 +319,8 @@ class PlotsMetricas(object):
         best = max(operon.pareto_front_, key=lambda x: x["r2"])
         operon.model_ = best["tree"]
         operon.stats_["model_r2"] = best["r2"]
-        operon.stats_["model_length"] = best["length"]
         operon.stats_["model_complexity"] = best["complexity"]
+        operon.stats_["model_mse"] = best["mean_squared_error"]
         operon.stats_["model_bic"] = best["bayesian_information_criterion"]
 
     # Selecionar modelo do Operon com a complexidade desejada
@@ -358,7 +358,7 @@ class PlotsMetricas(object):
         elif type(col_x) is str:
             X_bins = dados_bins[col_x].values.reshape(-1, 1)
         else:
-            raise("Mandou um objeto inválido, filho!")
+            raise ("Mandou um objeto inválido, filho!")
         fig, axes = plt.subplots(4, 2, figsize=(12, 14))
         fig.suptitle(
             "Qualidade dos Modelos Operon para Médias e Desvios-padrão: Predições vs Valores Reais",
@@ -371,7 +371,7 @@ class PlotsMetricas(object):
             ax_mean = axes[idx, 0]
             y_true_mean = dados_bins[f"{linha}_mean"].values
             y_pred_mean = modelos[f"{linha}_mean"].predict(X_bins)
-            r2_mean = r2_score(y_pred_mean, y_true_mean)
+            r2_mean = modelos[f"{linha}_mean"].stats_["model_r2"]
             ax_mean.plot(
                 [y_true_mean.min(), y_true_mean.max()],
                 [y_true_mean.min(), y_true_mean.max()],
@@ -390,7 +390,7 @@ class PlotsMetricas(object):
             ax_std = axes[idx, 1]
             y_true_std = dados_bins[f"{linha}_std"].values
             y_pred_std = modelos[f"{linha}_std"].predict(X_bins)
-            r2_std = r2_score(y_pred_std, y_true_std)
+            r2_std = modelos[f"{linha}_std"].stats_["model_r2"]
             ax_std.plot(
                 [y_true_std.min(), y_true_std.max()],
                 [y_true_std.min(), y_true_std.max()],
@@ -413,7 +413,7 @@ class PlotsMetricas(object):
         elif type(col_x) is str:
             X_bins = dados_bins[col_x].values.reshape(-1, 1)
         else:
-            raise("Mandou um objeto inválido, filho!")
+            raise ("Mandou um objeto inválido, filho!")
         fig, axes = plt.subplots(3, 2, figsize=(12, 10.5))
         fig.suptitle(
             "Qualidade dos Modelos Operon para Covariâncias: Predições vs Valores Reais",
@@ -427,7 +427,7 @@ class PlotsMetricas(object):
             #  Covariâncias
             y_true_cov = dados_bins[f"cov_{l1}_{l2}"].values
             y_pred_cov = modelos[f"cov_{l1}_{l2}"].predict(X_bins)
-            r2_cov = r2_score(y_pred_cov, y_true_cov)
+            r2_cov = modelos[f"cov_{l1}_{l2}"].stats_["model_r2"]
 
             ax.scatter(y_true_cov, y_pred_cov, alpha=0.75, s=20, color="purple")
             ax.plot(
@@ -611,54 +611,6 @@ class PlotsMetricas(object):
         for i in range(N):
             norma += np.sqrt((x2[i] - x1[i]) ** 2 + (y2[i] - y1[i]) ** 2)
         return norma / N
-
-    # Write scores on disk
-    def get_scores(self, col, scores, funcao):
-        txt = col + "\n"
-        txt += "MSE(train): %.6f\n" % scores["mse_train"]
-        txt += "R2(train): %.6f\n" % scores["r2_train"]
-        txt += "MSE: %.6f\n" % scores["mse"]
-        txt += "R2: %.6f\n" % scores["r2"]
-        txt += "%s\n" % funcao
-        return txt
-
-    def write_header(self, nome):
-        txt = "col;mse_train;r2_train;mse;r2;complexity;funcao\n"
-        file = open("metricas_%s.csv" % nome, "w")
-        file.write(txt)
-        file.close()
-
-    def write_scores(self, nome, col, complexity, scores, funcao):
-        txt = "%s;" % col
-        txt += "%.6f;" % scores["mse_train"]
-        txt += "%.6f;" % scores["r2_train"]
-        txt += "%.6f;" % scores["mse"]
-        txt += "%.6f;" % scores["r2"]
-        txt += "%d;" % complexity
-        txt += "%s\n" % funcao
-        file = open("metricas_%s.csv" % nome, "a")
-        file.write(txt)
-        file.close()
-
-    def calc_scores(self, y_train, y_test, y_pred_train, y_pred_test):
-        # Avaliar os modelos
-        mse_train = mean_squared_error(y_train, y_pred_train)
-        r2_train = r2_score(y_train, y_pred_train)
-        mse = mean_squared_error(y_test, y_pred_test)
-        r2 = r2_score(y_test, y_pred_test)
-        scores = {"mse_train": mse_train, "r2_train": r2_train, "mse": mse, "r2": r2}
-        return scores
-
-    # Pega combinações de funções do arquivo
-    def get_symbols(self):
-        symbols = []
-        with open("funcoes.txt", "r") as file:
-            line = file.readline()
-            while line != "":
-                if not line.startswith("!"):
-                    symbols.append(line.replace("\n", ""))
-                line = file.readline()
-        return symbols
 
     # Gerar bins e respectivas medianas de colunas
     def bins_and_medians(self, x, y, M):
@@ -1510,33 +1462,51 @@ class PlotsMetricas(object):
             f.write("<html><head>\n")
             f.write("<meta charset='utf-8'>\n")
             f.write("<style>\n")
-            f.write(".eq { white-space: pre-wrap; overflow-wrap: break-word; }\n")
+            f.write(
+                "pre { white-space: pre-wrap; overflow-wrap: break-word; font-size: large }\n"
+            )
+            f.write("th { font-size: x-large } td { font-size: large }\n")
             f.write("</style>\n")
-            f.write("</head><body>\n")
+            f.write(
+                "</head><body style='background-color: darkslategray; color: lightgray;'>\n"
+            )
             f.write(
                 "<h1>Equacoes dos modelos Operon para os estimadores da Normal</h1>\n"
             )
+            f.write("<table border='1'>\n")
+            f.write(
+                f"<tr>\
+                <th>Modelo</th>\
+                <th>Complex</th>\
+                <th>R2</th>\
+                <th>BIC</th>\
+                <th>Equacao</th>\
+                </tr>\n"
+            )
             for nome_modelo, modelo in modelos.items():
+                f.write("<tr>\n")
                 complexy = modelo.stats_["model_complexity"]
+                # mse_score = modelo.stats_["model_mse"]
                 r2_score = modelo.stats_["model_r2"]
                 bic_score = int(modelo.stats_["model_bic"])
-                f.write(f"<h3>{nome_modelo.upper()}</h3>\n")
+                f.write(f"<td>{nome_modelo.upper()}</td>\n")
                 f.write(
-                    f"<p>Complexidade: {complexy} | R2: {r2_score:.4f} | BIC: {bic_score}</p>\n"
+                    f"<td>{complexy}</td>\
+                    <td>{r2_score:.4f}</td>\
+                    <td>{bic_score}</td>\n"
                 )
                 buf = StringIO()
                 with contextlib.redirect_stdout(buf):
-                    # self.mostrar_equacao(modelo, col_x)
-                    print(f"Equacao: \n{modelo.expression}")
+                    print(modelo.expression)
                 eq_text = buf.getvalue()
                 eq_html = (
                     eq_text.replace("&", "&amp;")
                     .replace("<", "&lt;")
                     .replace(">", "&gt;")
                 )
-                f.write(f"<div class='eq'>{eq_html}</div>\n")
-                f.write("<hr/>\n")
-            f.write("</body></html>\n")
+                f.write(f"<td><pre>{eq_html}</pre></td>\n")
+                f.write("</tr>\n")
+            f.write("</table></body></html>\n")
         print()
         print("-" * 80)
         print(f"Escrito em {html_path}")
@@ -2098,9 +2068,9 @@ class PlotsMetricas(object):
 class OperonModelWrapper:
     def __init__(self, operon):
         self.coefficients = np.array(operon.model_.GetCoefficients())
-        self.expression   = operon.get_model_string(operon.model_, precision=6)
-        self._nodes       = list(operon.model_.Nodes)
-        self.stats_       = operon.stats_
+        self.expression = operon.get_model_string(operon.model_, precision=6)
+        self._nodes = list(operon.model_.Nodes)
+        self.stats_ = operon.stats_
 
     def _rebuild_model(self):
         """Reconstrói o objeto Tree a partir dos nós serializados."""
@@ -2124,10 +2094,9 @@ class OperonModelWrapper:
 
     def __repr__(self):
         return (
-            f"OperonModelWrapper(\n"
+            f"OperonModel(\n"
             f"  expression = {self.expression}\n"
             f"  complexity = {self.stats_["model_complexity"]}\n"
             f"  r2         = {self.stats_["model_r2"]:.4f}\n"
-            f"  bic       = {self.stats_["model_bic"]:.0f}\n"
             f")"
         )
