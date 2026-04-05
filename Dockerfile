@@ -23,10 +23,10 @@ RUN apt-get update && apt-get install -y \
     && rm -rf /var/lib/apt/lists/*
 
 # Cria e ativa um ambiente Conda chamado "pyoperon_env"
-RUN conda create -n pyoperon_env python=3.12 -y
+RUN conda create -n pyoperon_env python=3.13 -y
 
 # Instala o pyoperon e JupyterLab no ambiente conda
-RUN conda run -n pyoperon_env pip install numpy matplotlib scikit-learn pandas tqdm pyoperon==0.5.0 pysr==1.5.9 jupyterlab ipywidgets plotly spyder-kernels
+RUN conda run -n pyoperon_env pip install numpy matplotlib scikit-learn pandas tqdm pyoperon==0.6.1 pysr==1.5.9 jupyterlab ipywidgets plotly spyder-kernels
 
 # Adiciona o comando para ativar o ambiente ao bashrc
 RUN echo "conda activate pyoperon_env" >> ~/.bashrc
