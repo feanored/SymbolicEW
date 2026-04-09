@@ -16,11 +16,10 @@ from scipy.special import gammaln
 from scipy.optimize import minimize
 from sklearn.linear_model import QuantileRegressor
 from sklearn.model_selection import train_test_split
+from sklearn.metrics import r2_score
+from pysr import PySRRegressor
 import pyoperon.pyoperon as op
 from pyoperon.sklearn import SymbolicRegressor
-from mapie.metrics.regression import regression_coverage_score
-from mapie.regression import SplitConformalRegressor
-from mapie.utils import train_conformalize_test_split
 import warnings
 
 warnings.filterwarnings("ignore")
@@ -115,6 +114,7 @@ class PlotsMetricas(object):
 
     # split for conformal regression
     def split_conformal(self, dados, col_y, features):
+        from mapie.utils import train_conformalize_test_split
         X = dados[features].values
         y = dados[col_y].values
         (X_train, X_conform, X_test, y_train, y_conform, y_test) = (
@@ -351,14 +351,34 @@ class PlotsMetricas(object):
         else:
             raise ValueError("formato deve ser 'jupyter', 'latex' ou 'texto'")
 
+    # Treinar modelo do PySR para dada target
+    def treinar_pysr(self, configs, X_train, y_train):
+        model = PySRRegressor(**configs)
+        model.fit(X_train, y_train)
+        return model
+
+    # Ler modelo do PySR a partir de arquivo salvo
+    def ler_pysr(self, configs, path):
+        model = PySRRegressor.from_file(
+            run_directory=f"results/pysr/{path}",
+            model_selection=configs["model_selection"],
+        )
+        return model
+    
     # Gráficos da qualidade do ajuste das médias e desvios-padrão
     def inspecao_modelos(self, modelos, dados_bins, col_x):
-        if type(col_x) is list:
+        if isinstance(col_x, list):
             X_bins = dados_bins[col_x]
-        elif type(col_x) is str:
-            X_bins = dados_bins[col_x].values.reshape(-1, 1)
+        elif isinstance(col_x, str):
+            X_bins = dados_bins[[col_x]]
         else:
-            raise ("Mandou um objeto inválido, filho!")
+            raise ("Mandou um objeto inválido, filho!")        
+        # Drop rows with NaN in X_bins
+        X_bins = X_bins.dropna()        
+        dados_bins = dados_bins.loc[X_bins.index]        
+        if isinstance(col_x, str):
+            X_bins = X_bins.values.reshape(-1, 1)
+        
         fig, axes = plt.subplots(4, 2, figsize=(12, 14))
         fig.suptitle(
             "Qualidade dos Modelos Operon para Médias e Desvios-padrão: Predições vs Valores Reais",
@@ -370,8 +390,9 @@ class PlotsMetricas(object):
         for idx, linha in enumerate(self.targets[:4]):
             ax_mean = axes[idx, 0]
             y_true_mean = dados_bins[f"{linha}_mean"].values
-            y_pred_mean = modelos[f"{linha}_mean"].predict(X_bins)
-            r2_mean = modelos[f"{linha}_mean"].stats_["model_r2"]
+            X_for_pred = X_bins.values if isinstance(col_x, list) else X_bins
+            y_pred_mean = modelos[f"{linha}_mean"].predict(X_for_pred)
+            r2_mean = r2_score(y_true_mean, y_pred_mean)
             ax_mean.plot(
                 [y_true_mean.min(), y_true_mean.max()],
                 [y_true_mean.min(), y_true_mean.max()],
@@ -389,8 +410,9 @@ class PlotsMetricas(object):
         for idx, linha in enumerate(self.targets[:4]):
             ax_std = axes[idx, 1]
             y_true_std = dados_bins[f"{linha}_std"].values
-            y_pred_std = modelos[f"{linha}_std"].predict(X_bins)
-            r2_std = modelos[f"{linha}_std"].stats_["model_r2"]
+            X_for_pred = X_bins.values if isinstance(col_x, list) else X_bins
+            y_pred_std = modelos[f"{linha}_std"].predict(X_for_pred)
+            r2_std = r2_score(y_true_std, y_pred_std)
             ax_std.plot(
                 [y_true_std.min(), y_true_std.max()],
                 [y_true_std.min(), y_true_std.max()],
@@ -408,12 +430,18 @@ class PlotsMetricas(object):
 
     # Gráficos da qualidade do ajuste das covariâncias
     def inspecao_modelos_covs(self, modelos, dados_bins, col_x):
-        if type(col_x) is list:
+        if isinstance(col_x, list):
             X_bins = dados_bins[col_x]
-        elif type(col_x) is str:
-            X_bins = dados_bins[col_x].values.reshape(-1, 1)
+        elif isinstance(col_x, str):
+            X_bins = dados_bins[[col_x]]
         else:
-            raise ("Mandou um objeto inválido, filho!")
+            raise ("Mandou um objeto inválido, filho!")        
+        # Drop rows with NaN in X_bins
+        X_bins = X_bins.dropna()        
+        dados_bins = dados_bins.loc[X_bins.index]        
+        if isinstance(col_x, str):
+            X_bins = X_bins.values.reshape(-1, 1)
+        
         fig, axes = plt.subplots(3, 2, figsize=(12, 10.5))
         fig.suptitle(
             "Qualidade dos Modelos Operon para Covariâncias: Predições vs Valores Reais",
@@ -426,8 +454,9 @@ class PlotsMetricas(object):
 
             #  Covariâncias
             y_true_cov = dados_bins[f"cov_{l1}_{l2}"].values
-            y_pred_cov = modelos[f"cov_{l1}_{l2}"].predict(X_bins)
-            r2_cov = modelos[f"cov_{l1}_{l2}"].stats_["model_r2"]
+            X_for_pred = X_bins.values
+            y_pred_cov = modelos[f"cov_{l1}_{l2}"].predict(X_for_pred)
+            r2_cov = r2_score(y_true_cov, y_pred_cov)
 
             ax.scatter(y_true_cov, y_pred_cov, alpha=0.75, s=20, color="purple")
             ax.plot(
@@ -442,20 +471,6 @@ class PlotsMetricas(object):
             ax.grid(True, alpha=0.3)
 
         plt.tight_layout()
-
-    # Definir treinamento do modelo conformal
-    def conformal_regression(self, X_conform, y_conform, regressor, level=CONF_LEVEL):
-        mapie = SplitConformalRegressor(
-            estimator=regressor, confidence_level=level, prefit=True
-        )
-        mapie.conformalize(X_conform.reshape(-1, 1), y_conform)
-        return mapie
-
-    # Evaluate prediction and coverage level on testing set
-    def conformal_score(self, X_test, y_test, mapie):
-        y_pred, y_pis = mapie.predict_interval(X_test.reshape(-1, 1))
-        coverage = regression_coverage_score(y_test, y_pis)[0]
-        return coverage, y_pred, y_pis.reshape(-1, 2)
 
     # Gera pontos amostrais dentro do intervalo de conformidade
     def gerar_amostras_normais(self, df_medias, df_quantis, qtd=3, sigma_factor=12):
@@ -1453,7 +1468,7 @@ class PlotsMetricas(object):
         plt.legend()
         plt.show()
 
-    def salva_equacoes_html(self, modelos, col_x, title):
+    def salva_equacoes_html(self, modelos, title):
         import contextlib
         from io import StringIO
 
