@@ -364,7 +364,94 @@ class PlotsMetricas(object):
             model_selection=configs["model_selection"],
         )
         return model
-    
+
+    # Treinar modelo do ESR (Exhaustive Symbolic Regressor) para dada target.
+    #
+    # ESR é univariado por design: usa a feature indicada por configs['feature_index']
+    # (default=0) como variável de entrada. Para busca exaustiva completa é necessário
+    # MPI (mpirun); aqui o mock de MPI permite rodar sequencialmente em processo único.
+    #
+    # configs esperadas:
+    #   feature_index (int)  : índice da coluna de X_train a usar como variável x
+    #   fn_set        (str)  : conjunto de funções ('core_maths', 'ext_maths', …)
+    #   max_complexity(int)  : complexidade máxima das expressões (requer biblioteca gerada)
+    #   candidate_exprs(list): lista de strings de expressões a avaliar (alternativa ao fn_set)
+    #   pmin, pmax    (float): intervalo para inicialização dos parâmetros livres
+    #   tmax          (float): timeout em segundos por expressão
+    def treinar_esr(self, configs, X_train, y_train):
+        _esr_setup_mpi_mock()
+        from esr.fitting.test_all import optimise_fun
+        import esr.generation.simplifier as simplifier
+        import os
+
+        feature_index  = configs.get("feature_index", 0)
+        fn_set         = configs.get("fn_set", "core_maths")
+        max_complexity = configs.get("max_complexity", 5)
+        pmin           = configs.get("pmin", 0)
+        pmax           = configs.get("pmax", 5)
+        tmax           = configs.get("tmax", 5)
+
+        x_1d = X_train[:, feature_index]
+        yerr = np.full_like(y_train, max(y_train.std(), 1e-8))
+        likelihood = _ESRLikelihood(x_1d, y_train, yerr, fn_set=fn_set)
+
+        # Construir lista de expressões candidatas
+        candidate_exprs = configs.get("candidate_exprs", None)
+        if candidate_exprs is None:
+            candidate_exprs = []
+            esr_dir = os.path.abspath(
+                os.path.join(os.path.dirname(simplifier.__file__), "..", "")
+            ) + "/"
+            for comp in range(1, max_complexity + 1):
+                fn_file = os.path.join(
+                    esr_dir, "function_library", fn_set,
+                    f"compl_{comp}", f"unique_equations_{comp}.txt"
+                )
+                if os.path.exists(fn_file):
+                    with open(fn_file) as f:
+                        candidate_exprs.extend(line.strip() for line in f if line.strip())
+            if not candidate_exprs:
+                raise FileNotFoundError(
+                    f"Biblioteca de funções não encontrada em '{esr_dir}/function_library/{fn_set}'.\n"
+                    "Gere-a com: mpirun -n N python -m esr.generation.duplicate_checker <fn_set> <max_complexity>\n"
+                    "Ou forneça 'candidate_exprs' no configs com expressões explícitas."
+                )
+
+        best_chi2   = np.inf
+        best_fstr   = "a0"
+        best_params = np.zeros(4)
+
+        for fcn in candidate_exprs:
+            try:
+                chi2, params = optimise_fun(fcn, likelihood, tmax, pmin, pmax)
+                if np.isfinite(chi2) and chi2 < best_chi2:
+                    best_chi2   = chi2
+                    best_fstr   = fcn
+                    best_params = params.copy()
+            except Exception:
+                continue
+
+        return ESRModelWrapper(best_fstr, best_params, feature_index)
+
+    # Salvar modelo ESR via pickle
+    def save_esr(self, modelo, nome):
+        import os
+        os.makedirs("results/esr", exist_ok=True)
+        try:
+            with open(f"results/esr/{nome}.pkl", "wb") as f:
+                pickle.dump(modelo, f)
+        except Exception as e:
+            print(f"Ocorreu um erro ao salvar o modelo ESR do {nome}: \n{e}\n")
+
+    # Ler modelo ESR a partir de arquivo salvo
+    def ler_esr(self, nome):
+        try:
+            with open(f"results/esr/{nome}.pkl", "rb") as f:
+                modelo = pickle.load(f)
+        except:
+            modelo = None
+        return modelo
+
     # Gráficos da qualidade do ajuste das médias e desvios-padrão
     def inspecao_modelos(self, modelos, dados_bins, col_x):
         if isinstance(col_x, list):
@@ -2079,6 +2166,123 @@ class PlotsMetricas(object):
         except:
             modelo = None
         return modelo
+
+
+# --------------------------------------------------------------------------------------------------
+# Helpers para ESR (Exhaustive Symbolic Regression)
+# ESR usa mpi4py em nível de módulo; se MPI nativo não estiver instalado,
+# fazemos mock para que optimise_fun possa ser importado e usado em processo único.
+def _esr_setup_mpi_mock():
+    import sys
+    from unittest.mock import MagicMock
+    if "mpi4py" in sys.modules:
+        return
+    mock_comm = MagicMock()
+    mock_comm.Get_rank.return_value = 0
+    mock_comm.Get_size.return_value = 1
+    mock_mpi = MagicMock()
+    mock_mpi.COMM_WORLD = mock_comm
+    mock_mpi4py = MagicMock()
+    mock_mpi4py.MPI = mock_mpi
+    sys.modules["mpi4py"] = mock_mpi4py
+    sys.modules["mpi4py.MPI"] = mock_mpi
+
+
+class _ESRLikelihood:
+    """Likelihood Gaussiana para ESR que aceita arrays numpy diretamente (univariado)."""
+
+    def __init__(self, xvar, yvar, yerr, fn_set="core_maths"):
+        import esr.generation.simplifier as _simplifier
+        import os
+        esr_dir = os.path.abspath(
+            os.path.join(os.path.dirname(_simplifier.__file__), "..", "")
+        ) + "/"
+        self.fn_dir  = esr_dir + "function_library/" + fn_set + "/"
+        self.xvar    = xvar
+        self.yvar    = yvar
+        self.yerr    = yerr
+        self.is_mse  = False
+        self.fnprior_prefix    = "aifeyn_"
+        self.combineDL_prefix  = "combine_DL_"
+        self.final_prefix      = "final_"
+        self.base_out_dir = ""
+        self.temp_dir     = ""
+        self.out_dir      = ""
+
+    def get_pred(self, x, a, eq_numpy, **kwargs):
+        try:
+            return eq_numpy(x, *np.atleast_1d(a))
+        except Exception:
+            return np.inf
+
+    def negloglike(self, a, eq_numpy, **kwargs):
+        ypred = self.get_pred(self.xvar, np.atleast_1d(a), eq_numpy)
+        if not np.all(np.isreal(ypred)):
+            return np.inf
+        nll = np.sum(0.5 * (ypred - self.yvar) ** 2 / self.yerr ** 2)
+        return np.inf if np.isnan(nll) else nll
+
+    def run_sympify(self, fcn_i, **kwargs):
+        import sympy
+        from esr.fitting.sympy_symbols import inv, square, cube, sqrt, log, pow as esr_pow
+        from esr.fitting.sympy_symbols import x as esr_x, a0, a1, a2
+        fcn_i = fcn_i.replace("\n", "").replace("'", "")
+        eq = sympy.sympify(fcn_i, locals={
+            "inv": inv, "square": square, "cube": cube,
+            "sqrt": sqrt, "log": log, "pow": esr_pow,
+            "x": esr_x, "a0": a0, "a1": a1, "a2": a2,
+        })
+        return fcn_i, eq, False
+
+    def clear_data(self):
+        pass
+
+
+class ESRModelWrapper:
+    """Wrapper para modelos ESR com interface sklearn-like (predict)."""
+
+    def __init__(self, fstr, params, feature_index):
+        self.fstr          = fstr
+        self.params        = np.array(params)
+        self.feature_index = feature_index
+        self._build_lambdify()
+
+    def _build_lambdify(self):
+        import sympy
+        from esr.fitting.sympy_symbols import inv, square, cube, sqrt, log, pow as esr_pow
+        from esr.fitting.sympy_symbols import x as esr_x, a0, a1, a2
+        eq = sympy.sympify(self.fstr, locals={
+            "inv": inv, "square": square, "cube": cube,
+            "sqrt": sqrt, "log": log, "pow": esr_pow,
+            "x": esr_x, "a0": a0, "a1": a1, "a2": a2,
+        })
+        n_params = int(np.sum(self.params != 0))
+        param_syms = [sympy.symbols(f"a{i}") for i in range(n_params)]
+        self._eq_numpy = sympy.lambdify([esr_x] + param_syms, eq, modules=["numpy"])
+
+    def predict(self, X):
+        x_input = X[:, self.feature_index] if X.ndim > 1 else X
+        active_params = self.params[self.params != 0]
+        return self._eq_numpy(x_input, *active_params)
+
+    def __getstate__(self):
+        state = self.__dict__.copy()
+        del state["_eq_numpy"]
+        return state
+
+    def __setstate__(self, state):
+        self.__dict__.update(state)
+        _esr_setup_mpi_mock()
+        self._build_lambdify()
+
+    def __repr__(self):
+        return (
+            f"ESRModel(\n"
+            f"  expression    = {self.fstr}\n"
+            f"  params        = {self.params[self.params != 0]}\n"
+            f"  feature_index = {self.feature_index}\n"
+            f")"
+        )
 
 
 # --------------------------------------------------------------------------------------------------
