@@ -236,19 +236,21 @@ def evaluate_models(
         # Exibe gráfico real X predito
         plt.subplots(figsize=(7, 7))
         plt.scatter(
-            y_test[:, i], y_pred_test, alpha=0.3, s=2, edgecolors=None, color="gray"
+            y_test[:, i], y_pred_test, alpha=0.75, s=2, edgecolors=None, color="gray"
         )
         plt.plot(
             [y_test[:, i].min(), y_test[:, i].max()],
             [y_test[:, i].min(), y_test[:, i].max()],
             "r--",
+            alpha=0.5
         )
         p.curvas_densidade(y_test[:, i], y_pred_test)
-        plt.xlabel("Real")
-        plt.ylabel("Predito")
-        plt.title(p.unidades[targets[i]])
+        plt.xlabel("Real", fontsize="large")
+        plt.ylabel("Predito", fontsize="large")
+        plt.title(p.unidades[targets[i]], fontsize="x-large")
         plt.xlim([y_test[:, i].min(), y_test[:, i].max()])
         plt.ylim([y_test[:, i].min(), y_test[:, i].max()])
+        plt.grid(True, alpha=0.3)
         plt.savefig(f"results/compare_sr/fit_{algorithm}_{targets[i]}.png")
         plt.close()
 
@@ -377,7 +379,7 @@ def run_comparison(pysr=None, operon=False, rf=False, eggp=False):
                 X_train_scaled, y_train, pysr_config
             )
         elif pysr == "read":
-            pysr_models, elapsed = read_pysr_models(pysr_config, targets, "20260315_")
+            pysr_models, elapsed = read_pysr_models(pysr_config, targets, "20260316_")
         if pysr_models is not None:
             results_rows.extend(
                 evaluate_models(
