@@ -14,10 +14,10 @@ import plotly.io as pio
 from scipy import stats
 from scipy.special import gammaln
 from scipy.optimize import minimize
+from scipy.stats.qmc import LatinHypercube
 from sklearn.linear_model import QuantileRegressor
 from sklearn.model_selection import train_test_split
 from sklearn.metrics import r2_score
-from pysr import PySRRegressor
 import pyoperon.pyoperon as op
 from pyoperon.sklearn import SymbolicRegressor
 import warnings
@@ -353,12 +353,14 @@ class PlotsMetricas(object):
 
     # Treinar modelo do PySR para dada target
     def treinar_pysr(self, configs, X_train, y_train):
+        from pysr import PySRRegressor  
         model = PySRRegressor(**configs)
         model.fit(X_train, y_train)
         return model
 
     # Ler modelo do PySR a partir de arquivo salvo
     def ler_pysr(self, configs, path):
+        from pysr import PySRRegressor
         model = PySRRegressor.from_file(
             run_directory=f"results/pysr/{path}",
             model_selection=configs["model_selection"],
@@ -2032,6 +2034,74 @@ class PlotsMetricas(object):
             tipo="symb",
             save=save,
         )
+
+    def lhs_subsample_with_stats(self,
+        df: pd.DataFrame,
+        features: list,
+        targets: list,
+        n: int,
+        k_neighbors: int = 50,
+        seed: int = 42
+    ) -> pd.DataFrame:
+
+        d = len(features)
+        X = df[features].values
+        Y = df[targets].values
+
+        # Rank-transform para [0,1] (cópula empírica)
+        ranks = np.array([
+            (np.argsort(np.argsort(X[:, j])) + 0.5) / len(X)
+            for j in range(d)
+        ]).T  # (N, d)
+
+        # Plano LHS
+        sampler = LatinHypercube(d=d, seed=seed, optimization="random-cd")
+        lhs_plan = sampler.random(n=n)  # (n, d)
+
+        records = []
+        available = np.arange(len(X))
+
+        for lhs_point in lhs_plan:
+            dists = np.linalg.norm(ranks[available] - lhs_point, axis=1)
+            # Representante: ponto real mais próximo
+            best_local = np.argmin(dists)
+            best_global = available[best_local]
+
+            # Vizinhança: k pontos mais próximos (a "célula")
+            k = min(k_neighbors, len(available))
+            neighbor_local_idx = np.argpartition(dists, k)[:k]
+            neighbor_global_idx = available[neighbor_local_idx]
+
+            Y_cell = Y[neighbor_global_idx]
+
+            row = {}
+            # Representante das features
+            for j, col in enumerate(features):
+                row[col] = X[best_global, j]
+
+            # Stats dos targets na célula
+            for t, tcol in enumerate(targets):
+                row[f"{tcol}_mean"] = Y_cell[:, t].mean()
+                row[f"{tcol}_std"]  = Y_cell[:, t].std()
+
+            # Covariância entre targets (matriz achatada)
+            if len(targets) > 1:
+                cov = np.cov(Y_cell.T)  # (n_targets, n_targets)
+                for i, t1 in enumerate(targets):
+                    for j, t2 in enumerate(targets):
+                        if j > i:  # upper triangle
+                            row[f"cov_{t1}_{t2}"] = cov[i, j]
+
+            # Tamanho da célula
+            row["cell_size"] = k
+
+            records.append(row)
+
+            # Remove representante do pool (sem reposição)
+            available = np.delete(available, best_local)
+
+        return pd.DataFrame(records)
+
 
     def bpt_amostras_normais(self, dados, amostras):
         X_ = []
