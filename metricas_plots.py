@@ -15,6 +15,7 @@ from scipy import stats
 from scipy.special import gammaln
 from scipy.optimize import minimize
 from scipy.stats.qmc import LatinHypercube
+from scipy.stats import multivariate_normal
 from sklearn.linear_model import QuantileRegressor
 from sklearn.model_selection import train_test_split
 from sklearn.metrics import r2_score
@@ -366,7 +367,7 @@ class PlotsMetricas(object):
             model_selection=configs["model_selection"],
         )
         return model
-    
+
     # Gráficos da qualidade do ajuste das médias e desvios-padrão
     def inspecao_modelos(self, modelos, dados_bins, col_x):
         if isinstance(col_x, list):
@@ -380,7 +381,7 @@ class PlotsMetricas(object):
         dados_bins = dados_bins.loc[X_bins.index]        
         if isinstance(col_x, str):
             X_bins = X_bins.values.reshape(-1, 1)
-        
+
         fig, axes = plt.subplots(4, 2, figsize=(12, 14))
         fig.suptitle(
             "Qualidade dos Modelos Operon para Médias e Desvios-padrão: Predições vs Valores Reais",
@@ -443,7 +444,7 @@ class PlotsMetricas(object):
         dados_bins = dados_bins.loc[X_bins.index]        
         if isinstance(col_x, str):
             X_bins = X_bins.values.reshape(-1, 1)
-        
+
         fig, axes = plt.subplots(3, 2, figsize=(12, 10.5))
         fig.suptitle(
             "Qualidade dos Modelos Operon para Covariâncias: Predições vs Valores Reais",
@@ -2035,6 +2036,125 @@ class PlotsMetricas(object):
             save=save,
         )
 
+    def gerar_amostras(self, modelos, algo, test, test_lhc):
+        X_test = test[self.features].to_numpy(dtype=np.float64, copy=True)
+        larguras = self.targets[:4]
+        n_samples = len(X_test)
+        print(
+            f"Estimando parâmetros de {n_samples} pontos do conjunto de validação para a Normal Multivariada..."
+        )
+
+        means_all = np.column_stack(
+            [modelos[f"{nome}_mean"].predict(X_test) for nome in larguras]
+        )
+        if algo == "operon":
+            stds_all = np.column_stack(
+                [np.full(n_samples, test_lhc[f"{nome}_std"].mean()) for nome in larguras]
+            )
+        else:
+            stds_all = np.column_stack(
+                [np.maximum(modelos[f"{nome}_std"].predict(X_test), 1e-6) for nome in larguras]
+            )
+        covs_all = {}
+        for l1, l2 in self.cov_pairs:
+            covs_all[(l1, l2)] = modelos[f"cov_{l1}_{l2}"].predict(X_test)
+        print("Predições dos estimadores concluídas!")
+
+        n_correcoes = 0
+        amostras_multivariadas = np.zeros((n_samples, 4))
+        idx_map = {nome: j for j, nome in enumerate(larguras)}
+        print("\nAmostragem multivariada iniciada..\n")
+
+        for i in range(n_samples):
+            if i % 5000 == 0 and i > 0:
+                print(f"  Progresso: {i}/{n_samples} ({100*i/n_samples:.1f}%)")
+
+            # Montar matriz de covariância
+            mean_vector = means_all[i]
+            stds = stds_all[i]
+            cov_matrix = np.diag(stds**2)
+
+            # Preencher covariâncias com validação
+            for (l1_nome, l2_nome), cov_vals in covs_all.items():
+                i1 = idx_map[l1_nome]
+                i2 = idx_map[l2_nome]
+                if np.isfinite(cov_vals[i]):
+                    cov_matrix[i1, i2] = cov_vals[i]
+                    cov_matrix[i2, i1] = cov_vals[i]
+
+            # Remover infs e NaNs e garantir simetria
+            cov_matrix = np.nan_to_num(cov_matrix, nan=0.0, posinf=0.0, neginf=0.0)
+            cov_matrix = (cov_matrix + cov_matrix.T) / 2
+
+            # Regularização robusta
+            corrigiu = False
+            try:
+                if not np.all(np.isfinite(cov_matrix)):
+                    raise ValueError("Matriz ainda contém valores não-finitos")
+
+                # Corrigir autovalores negativos ou muito pequenos
+                min_eigenval = 1e-8
+                eigenvalues, eigenvectors = np.linalg.eigh(cov_matrix)
+                if np.any(eigenvalues < min_eigenval):
+                    eigenvalues = np.maximum(eigenvalues, min_eigenval)
+                    cov_matrix = eigenvectors @ np.diag(eigenvalues) @ eigenvectors.T
+                    corrigiu = True
+
+                sample = multivariate_normal(
+                    mean=mean_vector, cov=cov_matrix, allow_singular=True
+                ).rvs()
+
+            except Exception as e:
+                # Se tudo falhar, usar matriz diagonal
+                cov_matrix = np.diag(stds**2)
+                eigenvalues, eigenvectors = np.linalg.eigh(cov_matrix)
+                if not np.all(np.isfinite(cov_matrix)) or np.any(
+                    eigenvalues < min_eigenval
+                ):
+                    corrigiu = False
+                    n_samples -= 1
+                    continue  # esquece e passa pra próxima combinação
+                sample = multivariate_normal(
+                    mean=mean_vector, cov=cov_matrix, allow_singular=False
+                ).rvs()
+                corrigiu = True
+
+            finally:
+                if corrigiu:
+                    n_correcoes += 1
+
+            amostras_multivariadas[i] = sample
+
+        p_correcao = 100 * n_correcoes / n_samples
+        amostras = {
+            "p_correcao": p_correcao,
+            larguras[0]: amostras_multivariadas[:, 0],
+            larguras[1]: amostras_multivariadas[:, 1],
+            larguras[2]: amostras_multivariadas[:, 2],
+            larguras[3]: amostras_multivariadas[:, 3],
+        }
+
+        # Adicionar features do X_test (mesma ordem de linha)
+        for j, f in enumerate(self.features):
+            amostras[f] = X_test[:, j]
+
+        print("\nAmostragem multivariada concluída!")
+        print(f"   - Amostras: {n_samples}")
+        print(f"   - Matrizes corrigidas: {n_correcoes} ({p_correcao:.1f}%)\n")
+
+        # Salvando amostras em CSV
+        df_amostras = pd.DataFrame(amostras)
+        df_amostras.to_csv(f"results/amostras_all_{algo}.csv", index=False)
+
+        print("Estatísticas:")
+        for nome in larguras:
+            valores = df_amostras[nome]
+            print(
+                f"  {nome:12s}: média={valores.mean():7.3f}, std={valores.std():6.3f}, "
+                f"min={valores.min():7.3f}, max={valores.max():7.3f}"
+            )
+        return p_correcao
+
     def lhs_subsample_with_stats(self,
         df: pd.DataFrame,
         features: list,
@@ -2101,7 +2221,6 @@ class PlotsMetricas(object):
             available = np.delete(available, best_local)
 
         return pd.DataFrame(records)
-
 
     def bpt_amostras_normais(self, dados, amostras):
         X_ = []
