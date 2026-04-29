@@ -18,7 +18,6 @@ from scipy.stats.qmc import LatinHypercube
 from scipy.stats import multivariate_normal
 from sklearn.linear_model import QuantileRegressor
 from sklearn.model_selection import train_test_split
-from sklearn.metrics import r2_score
 import pyoperon.pyoperon as op
 from pyoperon.sklearn import SymbolicRegressor
 import warnings
@@ -395,7 +394,7 @@ class PlotsMetricas(object):
             y_true_mean = dados_bins[f"{linha}_mean"].values
             X_for_pred = X_bins.values if isinstance(col_x, list) else X_bins
             y_pred_mean = modelos[f"{linha}_mean"].predict(X_for_pred)
-            r2_mean = r2_score(y_true_mean, y_pred_mean)
+            r2_mean = modelos[f"{linha}_mean"].stats_["model_r2"]
             ax_mean.plot(
                 [y_true_mean.min(), y_true_mean.max()],
                 [y_true_mean.min(), y_true_mean.max()],
@@ -415,7 +414,7 @@ class PlotsMetricas(object):
             y_true_std = dados_bins[f"{linha}_std"].values
             X_for_pred = X_bins.values if isinstance(col_x, list) else X_bins
             y_pred_std = modelos[f"{linha}_std"].predict(X_for_pred)
-            r2_std = r2_score(y_true_std, y_pred_std)
+            r2_std = modelos[f"{linha}_std"].stats_["model_r2"]
             ax_std.plot(
                 [y_true_std.min(), y_true_std.max()],
                 [y_true_std.min(), y_true_std.max()],
@@ -457,9 +456,9 @@ class PlotsMetricas(object):
 
             #  Covariâncias
             y_true_cov = dados_bins[f"cov_{l1}_{l2}"].values
-            X_for_pred = X_bins.values
+            X_for_pred = X_bins.values if isinstance(col_x, list) else X_bins
             y_pred_cov = modelos[f"cov_{l1}_{l2}"].predict(X_for_pred)
-            r2_cov = r2_score(y_true_cov, y_pred_cov)
+            r2_cov = modelos[f"cov_{l1}_{l2}"].stats_["model_r2"]
 
             ax.scatter(y_true_cov, y_pred_cov, alpha=0.75, s=20, color="purple")
             ax.plot(
