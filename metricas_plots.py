@@ -1766,7 +1766,7 @@ class PlotsMetricas(object):
         # Linhas de separação
         plt.vlines(
             -0.4,
-            np.log10(0.5) + 0.4,
+            np.log10(3),
             3,
             alpha=0.8,
             label="S06 SF/AGN",
@@ -1776,16 +1776,12 @@ class PlotsMetricas(object):
             np.log10(6), -0.4, 1, alpha=0.8, label="Ke06 Seyfert/LINER", color="green"
         )
         plt.hlines(
-            np.log10(3), -0.4, 1, alpha=0.8, label="Fe11 wAGN/RG", color="darkred"
+            np.log10(3), -2, 1, alpha=0.8, label="Fe11 wAGN/RG", color="darkred"
         )
         plt.hlines(np.log10(0.5), -2, 0, alpha=0.8, linestyles="--", color="black")
-        plt.hlines(np.log10(0.5), 0, 1, alpha=0.8, linestyles=":", color="black")
-        x = np.arange(-2, 0, 0.01)
+        x = np.arange(0, 1, 0.01)
         y = np.log10(0.5) - x
-        plt.plot(x, y, ":", alpha=0.8, color="black")
-        x = np.arange(0, np.log10(0.5) + 0.8, 0.01)
-        y = np.log10(0.5) - x
-        plt.plot(x, y, "--", alpha=0.8, color="black")
+        plt.plot(x, y, "--", alpha=0.8, color="black", label="Fe11 RG/Passive")
         plt.text(-0.7, 2.5, "SF")
         plt.text(0, 1.5, "Seyfert")
         plt.text(0.4, 0.6, "wAGN")
