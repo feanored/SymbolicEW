@@ -1,0 +1,262 @@
+<!DOCTYPE html>
+<html lang="pt">
+<head>
+<meta charset="utf-8">
+<title>Equações Operon - Estimadores da Normal em função de atflux</title>
+<script>
+MathJax = {{
+  tex: {{
+    inlineMath: [['$$$$','$$$$']],
+    displayMath: [['\\[','\\]'],['$$$$$$$$','$$$$$$$$']]
+  }},
+  options: {{ skipHtmlTags: ['script','noscript','style','textarea','pre'] }}
+}};
+</script>
+<script async src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-chtml.js"></script>
+<style>
+* {{ box-sizing: border-box; }}
+body {
+  font-family: 'Courier New', monospace;
+  padding: 24px;
+  margin: 0;
+  background: #cccccc;
+}
+h1 {
+  font-size: 1.3em;
+  border-bottom: 1px solid #3a5f5f;
+  padding-bottom: 10px;
+  margin-bottom: 20px;
+  letter-spacing: 0.05em;
+}
+table {
+  border-collapse: collapse;
+  width: 100%;
+  font-size: 0.88em;
+}
+th {
+  border: 1px solid #3a5f5f;
+  padding: 10px 14px;
+  text-align: left;
+  font-size: 1em;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+td {
+  border: 1px solid #2a4a4a;
+  padding: 12px 14px;
+  vertical-align: top;
+}
+.model {
+  font-weight: bold;
+  white-space: nowrap;
+  width: 16%;
+  letter-spacing: 0.03em;
+}
+.eq {
+  width: 54%;
+  font-size: 1.2em;
+  overflow-x: auto;
+}
+.ci {
+  white-space: nowrap;
+  font-size: 1.25em;
+}
+</style>
+</head>
+<body>
+<h1>Equações Operon - Estimadores da Normal em função de atflux</h1>
+<table>
+<tr><th>Modelo</th><th>Equação</th><th>Constantes</th></tr>
+
+<tr>
+  <td class="model">NII_6584_EW_MEAN</td>
+  <td class="eq">\[ C_1 + C_2 \left( \exp\!\left(\dfrac{C_3 X_1}{\sqrt{1+(C_4 X_1+C_5)^2}}\right) - \dfrac{C_6}{\sqrt{1+(C_7+C_8 X_1)^2}\sqrt{1+(C_9+C_{10} X_1)^2}\sqrt{1+(C_{11}+C_{12} X_1)^2}} \right) \]</td>
+  <td class="consts"><span class="ci">$$C_1 = 0.000124$$</span>
+<span class="ci">$$C_2 = 0.9998$$</span>
+<span class="ci">$$C_3 = -0.009538$$</span>
+<span class="ci">$$C_4 = 14.967477$$</span>
+<span class="ci">$$C_5 = -146.768265$$</span>
+<span class="ci">$$C_6 = 71.46579$$</span>
+<span class="ci">$$C_7 = -18.096664$$</span>
+<span class="ci">$$C_8 = 2.263927$$</span>
+<span class="ci">$$C_9 = -148.607941$$</span>
+<span class="ci">$$C_{10} = 13.039479$$</span>
+<span class="ci">$$C_{11} = -57.011719$$</span>
+<span class="ci">$$C_{12} = 5.698961$$</span></td>
+</tr>
+<tr>
+  <td class="model">HALPHA_EW_MEAN</td>
+  <td class="eq">\[ C_1 + C_2 \left( \dfrac{\dfrac{\dfrac{C_3}{\sqrt{1+\left((C_4 X_1)^{C_5 X_1}\right)^2}} - C_6 X_1}{\sqrt{1+\left((C_7 X_1)^{C_8}\right)^2}} - C_9}{\sqrt{1+\left((C_{10} X_1)^{(C_{11} X_1)^{C_{12} X_1}}\right)^2}} - C_{13} \right) \]</td>
+  <td class="consts"><span class="ci">$$C_1 = -0.000039$$</span>
+<span class="ci">$$C_2 = 1.000027$$</span>
+<span class="ci">$$C_3 = 1.335235$$</span>
+<span class="ci">$$C_4 = 0.107007$$</span>
+<span class="ci">$$C_5 = 1.558321$$</span>
+<span class="ci">$$C_6 = -0.042404$$</span>
+<span class="ci">$$C_7 = 0.102276$$</span>
+<span class="ci">$$C_8 = 63.083298$$</span>
+<span class="ci">$$C_9 = 3.31741$$</span>
+<span class="ci">$$C_{10} = 0.09941$$</span>
+<span class="ci">$$C_{11} = 0.137062$$</span>
+<span class="ci">$$C_{12} = 1.946261$$</span>
+<span class="ci">$$C_{13} = -3.209775$$</span></td>
+</tr>
+<tr>
+  <td class="model">OIII_5007_EW_MEAN</td>
+  <td class="eq">\[ C_1 + C_2 \left( \dfrac{\exp(C_3)}{\sqrt{1+\left((C_4 X_1)^{C_5 X_1 - C_6}\right)^2}} - (C_7 X_1 + C_8) \right) \]</td>
+  <td class="consts"><span class="ci">$$C_1 = 0$$</span>
+<span class="ci">$$C_2 = 1$$</span>
+<span class="ci">$$C_3 = -1.043616$$</span>
+<span class="ci">$$C_4 = 0.110383$$</span>
+<span class="ci">$$C_5 = 22.287374$$</span>
+<span class="ci">$$C_6 = 154.518921$$</span>
+<span class="ci">$$C_7 = 0.452157$$</span>
+<span class="ci">$$C_8 = -4.384304$$</span></td>
+</tr>
+<tr>
+  <td class="model">HBETA_EW_MEAN</td>
+  <td class="eq">\[ C_1 + C_2 \left( \dfrac{C_3}{\sqrt{1+\left(\dfrac{(C_4 X_1)^{C_5 X_1}-(C_6 X_1)^{C_7}}{\sqrt{1+\left((C_8 X_1)^{C_9 X_1}\right)^2}}\right)^2}} - \dfrac{C_{10} X_1}{\sqrt{1+\left((C_{11} X_1)^{C_{12}}\right)^2}} \right) \]</td>
+  <td class="consts"><span class="ci">$$C_1 = -0.000011$$</span>
+<span class="ci">$$C_2 = 1.000022$$</span>
+<span class="ci">$$C_3 = 8.426193$$</span>
+<span class="ci">$$C_4 = 0.180837$$</span>
+<span class="ci">$$C_5 = -0.270385$$</span>
+<span class="ci">$$C_6 = 0.104491$$</span>
+<span class="ci">$$C_7 = 66.656647$$</span>
+<span class="ci">$$C_8 = 0.11413$$</span>
+<span class="ci">$$C_9 = 2.008246$$</span>
+<span class="ci">$$C_{10} = 0.842105$$</span>
+<span class="ci">$$C_{11} = 0.100312$$</span>
+<span class="ci">$$C_{12} = 48.548809$$</span></td>
+</tr>
+<tr>
+  <td class="model">NII_6584_EW_STD</td>
+  <td class="eq">\[ C_1 + C_2 \exp\!\left(\dfrac{C_3 X_1}{\sqrt{1+\left(\dfrac{C_4 X_1}{\sqrt{1+(C_5 - C_6 X_1)^2}} - C_7 X_1\right)^2}}\right) \]</td>
+  <td class="consts"><span class="ci">$$C_1 = -0.009386$$</span>
+<span class="ci">$$C_2 = 1.032781$$</span>
+<span class="ci">$$C_3 = -0.144415$$</span>
+<span class="ci">$$C_4 = -0.671543$$</span>
+<span class="ci">$$C_5 = 3.968787$$</span>
+<span class="ci">$$C_6 = 0.475291$$</span>
+<span class="ci">$$C_7 = -0.621485$$</span></td>
+</tr>
+<tr>
+  <td class="model">HALPHA_EW_STD</td>
+  <td class="eq">\[ C_1 + C_2 \dfrac{C_3^{(C_4 X_1)^{C_5 X_1}}}{\sqrt{1+(C_6 X_1+(C_7 X_1)^{C_8 X_1}+C_9)^2}} \]</td>
+  <td class="consts"><span class="ci">$$C_1 = -0.000339$$</span>
+<span class="ci">$$C_2 = 1.001172$$</span>
+<span class="ci">$$C_3 = 2.163295$$</span>
+<span class="ci">$$C_4 = 0.102879$$</span>
+<span class="ci">$$C_5 = 4.392052$$</span>
+<span class="ci">$$C_6 = 1.115173$$</span>
+<span class="ci">$$C_7 = 0.102808$$</span>
+<span class="ci">$$C_8 = 13.159259$$</span>
+<span class="ci">$$C_9 = -5.80371$$</span></td>
+</tr>
+<tr>
+  <td class="model">OIII_5007_EW_STD</td>
+  <td class="eq">\[ C_1 + C_2 \exp\!\left(\tanh\!\left(\dfrac{\exp(C_3 X_1)}{\sqrt{1+\left(\dfrac{C_4}{\sqrt{1+(C_5 X_1 - C_6)^2}}\right)^2}}\right)\right) \]</td>
+  <td class="consts"><span class="ci">$$C_1 = -12.039471$$</span>
+<span class="ci">$$C_2 = 12.353174$$</span>
+<span class="ci">$$C_3 = -0.525712$$</span>
+<span class="ci">$$C_4 = 1.710018$$</span>
+<span class="ci">$$C_5 = 9.112995$$</span>
+<span class="ci">$$C_6 = 85.93721$$</span></td>
+</tr>
+<tr>
+  <td class="model">HBETA_EW_STD</td>
+  <td class="eq">\[ C_1 + C_2 \exp\!\left(\dfrac{C_3 - C_4 X_1}{\sqrt{1+\left(\dfrac{C_5 X_1}{\sqrt{1+(C_6 - C_7 X_1)^2}}\right)^2}}\right) \]</td>
+  <td class="consts"><span class="ci">$$C_1 = 0.000164$$</span>
+<span class="ci">$$C_2 = 0.999388$$</span>
+<span class="ci">$$C_3 = 1.600297$$</span>
+<span class="ci">$$C_4 = 0.358535$$</span>
+<span class="ci">$$C_5 = -0.156042$$</span>
+<span class="ci">$$C_6 = 39.758148$$</span>
+<span class="ci">$$C_7 = 4.045269$$</span></td>
+</tr>
+<tr>
+  <td class="model">COV_NII_6584_EW_HALPHA_EW</td>
+  <td class="eq">\[ C_1 + C_2 \left( \dfrac{\dfrac{C_3 X_1}{\sqrt{1+(C_4+C_5 X_1)^2}}+(C_6 X_1)^{C_7 X_1}}{\sqrt{1+(C_8+C_9 X_1)^2}} + (C_{10} X_1)^{C_{11}} \right) \]</td>
+  <td class="consts"><span class="ci">$$C_1 = 0.000087$$</span>
+<span class="ci">$$C_2 = 0.998743$$</span>
+<span class="ci">$$C_3 = 0.046909$$</span>
+<span class="ci">$$C_4 = -21.308739$$</span>
+<span class="ci">$$C_5 = 2.632188$$</span>
+<span class="ci">$$C_6 = 0.098531$$</span>
+<span class="ci">$$C_7 = 28.337626$$</span>
+<span class="ci">$$C_8 = -55.592243$$</span>
+<span class="ci">$$C_9 = 5.636674$$</span>
+<span class="ci">$$C_{10} = 0.188533$$</span>
+<span class="ci">$$C_{11} = -7.923004$$</span></td>
+</tr>
+<tr>
+  <td class="model">COV_NII_6584_EW_OIII_5007_EW</td>
+  <td class="eq">\[ C_1 + C_2 \left( \dfrac{(C_3 X_1)^{C_4 X_1}}{\sqrt{1+(C_5 X_1+C_6)^2}} - C_7 - \dfrac{\exp(C_8 X_1)}{\sqrt{1+(C_9 X_1+C_{10})^2}} - C_{11} X_1 \right) \]</td>
+  <td class="consts"><span class="ci">$$C_1 = 0$$</span>
+<span class="ci">$$C_2 = 0.999999$$</span>
+<span class="ci">$$C_3 = 0.115048$$</span>
+<span class="ci">$$C_4 = -2.53842$$</span>
+<span class="ci">$$C_5 = 177.627411$$</span>
+<span class="ci">$$C_6 = -1755.778564$$</span>
+<span class="ci">$$C_7 = 0.104528$$</span>
+<span class="ci">$$C_8 = -0.275121$$</span>
+<span class="ci">$$C_9 = -1.738381$$</span>
+<span class="ci">$$C_{10} = 15.799223$$</span>
+<span class="ci">$$C_{11} = -0.021658$$</span></td>
+</tr>
+<tr>
+  <td class="model">COV_NII_6584_EW_HBETA_EW</td>
+  <td class="eq">\[ C_1 + C_2 \left( \dfrac{\dfrac{C_3}{\sqrt{1+(C_4 X_1+C_5)^2}}}{\sqrt{1+(C_6 X_1+C_7)^2}} + (C_8 X_1)^{C_9} \right) \]</td>
+  <td class="consts"><span class="ci">$$C_1 = 0.000109$$</span>
+<span class="ci">$$C_2 = 0.998123$$</span>
+<span class="ci">$$C_3 = 0.350305$$</span>
+<span class="ci">$$C_4 = 2.493476$$</span>
+<span class="ci">$$C_5 = -20.173159$$</span>
+<span class="ci">$$C_6 = -5.306932$$</span>
+<span class="ci">$$C_7 = 52.199791$$</span>
+<span class="ci">$$C_8 = 0.18576$$</span>
+<span class="ci">$$C_9 = -8.84796$$</span></td>
+</tr>
+<tr>
+  <td class="model">COV_HALPHA_EW_OIII_5007_EW</td>
+  <td class="eq">\[ C_1 + C_2 \exp\!\left(C_3 + (C_4 X_1)^{C_5 X_1 - C_6} - C_7 X_1\right) \]</td>
+  <td class="consts"><span class="ci">$$C_1 = 0.00109$$</span>
+<span class="ci">$$C_2 = 0.985577$$</span>
+<span class="ci">$$C_3 = 3.549076$$</span>
+<span class="ci">$$C_4 = 0.100457$$</span>
+<span class="ci">$$C_5 = -123.473137$$</span>
+<span class="ci">$$C_6 = -1228.923828$$</span>
+<span class="ci">$$C_7 = 0.703781$$</span></td>
+</tr>
+<tr>
+  <td class="model">COV_HALPHA_EW_HBETA_EW</td>
+  <td class="eq">\[ C_1 + C_2 \left( C_3 X_1 + \exp\!\left(C_4 X_1 + \exp\!\left(\exp\!\left((C_5 X_1)^{(C_6 X_1)^{C_7}+C_8 X_1}\right)\right)\right) \right) \]</td>
+  <td class="consts"><span class="ci">$$C_1 = -0.000058$$</span>
+<span class="ci">$$C_2 = 1.000789$$</span>
+<span class="ci">$$C_3 = -0.001515$$</span>
+<span class="ci">$$C_4 = -0.630703$$</span>
+<span class="ci">$$C_5 = 0.098844$$</span>
+<span class="ci">$$C_6 = 0.103888$$</span>
+<span class="ci">$$C_7 = 113.687637$$</span>
+<span class="ci">$$C_8 = 2.471538$$</span></td>
+</tr>
+<tr>
+  <td class="model">COV_OIII_5007_EW_HBETA_EW</td>
+  <td class="eq">\[ C_1 + C_2 \left( \dfrac{C_3}{\sqrt{1+(C_4+C_5 X_1)^2}} + \dfrac{C_6}{\sqrt{1+(C_7 X_1+C_8)^2}} + \dfrac{C_9}{\sqrt{1+\left((C_{10} X_1)^{C_{11}}\right)^2}} + (C_{12} X_1)^{C_{13} X_1} \right) \]</td>
+  <td class="consts"><span class="ci">$$C_1 = 0.000334$$</span>
+<span class="ci">$$C_2 = 0.995451$$</span>
+<span class="ci">$$C_3 = -0.094844$$</span>
+<span class="ci">$$C_4 = 293.996002$$</span>
+<span class="ci">$$C_5 = -38.38937$$</span>
+<span class="ci">$$C_6 = 0.056888$$</span>
+<span class="ci">$$C_7 = 225.785034$$</span>
+<span class="ci">$$C_8 = -2231.89502$$</span>
+<span class="ci">$$C_9 = 0.031874$$</span>
+<span class="ci">$$C_{10} = 0.103042$$</span>
+<span class="ci">$$C_{11} = -87.420998$$</span>
+<span class="ci">$$C_{12} = 0.22953$$</span>
+<span class="ci">$$C_{13} = -0.422718$$</span></td>
+</tr>
+</table>
+</body>
+</html>
