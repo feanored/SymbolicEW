@@ -944,7 +944,7 @@ class PlotsMetricas(object):
         plt.show()
 
     def histogram_v(
-        self, dados, title, ax, bins, density=True, lim=None, cor=None, lbl=""
+        self, dados, title, ax, bins=100, density=True, lim=None, cor=None, lbl="", alpha=0.5
     ):
         ax.set_xlabel("Value", fontsize="x-large")
         ax.set_ylabel("Density", fontsize="x-large")
@@ -956,7 +956,7 @@ class PlotsMetricas(object):
             density=density,
             color=cor,
             label=lbl,
-            alpha=0.5,
+            alpha=alpha,
         )
         ax.set_title(title, fontsize="xx-large")
         ax.legend(fontsize="x-large")
@@ -972,10 +972,12 @@ class PlotsMetricas(object):
         plt.title(title)
         plt.show()
 
-    def calcula_kl(self, reais, amostras, col, bins):
+    def calcula_kl(self, reais, amostras, col1, bins, col2=None):
         eps = 1e-9
-        p_counts, _ = np.histogram(reais[col], bins=bins)
-        q_counts, _ = np.histogram(amostras[col], bins=bins)
+        if col2 is None:
+            col2 = col1
+        p_counts, _ = np.histogram(reais[col1], bins=bins)
+        q_counts, _ = np.histogram(amostras[col2], bins=bins)
         p = p_counts / p_counts.sum() + eps
         q = q_counts / q_counts.sum() + eps
         kl = np.sum(p * np.log(p / q))
