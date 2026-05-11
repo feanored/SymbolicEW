@@ -26,7 +26,6 @@ O projeto realiza um benchmark rigoroso entre quatro abordagens:
 | **Operon** | `pyoperon==0.6.1` | SR com seleção por BIC e fronteira de Pareto (R² × complexidade) |
 | **PySR** | `pysr==1.5.9` | SR via programação genética com backend Julia |
 | **RandomForest** | `scikit-learn` | Baseline não-simbólico para referência de desempenho |
-<!-- | **egGP** | `eggp` | SR multi-view com 10 ilhas estratificadas por distribuição de y | -->
 
 ---
 
@@ -48,6 +47,7 @@ SymbolicEW/
 ├── A-CompareSR.py          # Benchmark completo: RF × Operon × PySR × egGP
 ├── B-GridSearchOperon.py   # Grid search de hiperparâmetros do Operon
 ├── C-MetricasOperon.py     # Extração e avaliação dos modelos Pareto-ótimos do Operon
+├── D-BIC_Operon.py         # Executa uma rodada de amostras LH e calcula a significância da métrica BIC
 │
 ├── metricas_plots.py       # Funções compartilhadas: métricas, histogramas, BPT, WHAN
 ├── fileserver.py           # Servidor de arquivos para workflows remotos
