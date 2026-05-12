@@ -575,9 +575,10 @@ class PlotsMetricas(object):
             )
             cbar = plt.colorbar(scatter)
             cbar.set_label(color, rotation=90, labelpad=2)
+        self.bpt_config("BPT Diagram: %s" % title, "EW ")
         if densities:
             self.curvas_densidade(dados[T.nii_ha.value], dados[T.oiii_hb.value])
-        self.bpt_config("Diagrama BPT: %s" % title, "EW ")
+        plt.legend(loc="lower left", fontsize="medium")
         if show:
             plt.show()
 
@@ -612,9 +613,10 @@ class PlotsMetricas(object):
             )
             cbar = plt.colorbar(scatter)
             cbar.set_label(color, rotation=90, labelpad=2)
+        self.whan_config("WHAN Diagram: %s" % title, "EW ")
         if densities:
             self.curvas_densidade(dados[T.nii_ha.value], dados[T.ha.value])
-        self.whan_config("Diagrama WHAN: %s" % title, "EW ")
+        plt.legend(loc="lower left", fontsize="medium")
         if show:
             plt.show()
 
@@ -1790,7 +1792,7 @@ class PlotsMetricas(object):
         plt.text(0.4, 0, "RG")
         plt.text(-0.3, -0.55, "Passive")
 
-    def whan_config(self, titulo="Diagrama WHAN", sfx=""):
+    def whan_config(self, titulo="WHAN Diagram", sfx=""):
         self.plot_KeKa06()  # linhas de separação teóricas
         plt.title(titulo, fontsize="x-large")
         plt.xlabel(r"$log_{10}$(%s[NII] / %sH$\alpha$)" % (sfx, sfx), fontsize="large")
@@ -1800,7 +1802,6 @@ class PlotsMetricas(object):
         plt.xlim(-2, 1)
         plt.ylim(-0.8, 3)
         plt.grid(True, alpha=0.2)
-        plt.legend(loc="upper right", fontsize="small")
         plt.tight_layout()
 
     def curvas_densidade(self, dados_x, dados_y, levels=True):
@@ -1819,10 +1820,10 @@ class PlotsMetricas(object):
             color="purple",
             alpha=0.5,
             linewidth=1,
-            label="Níveis de densidade numérica",
+            label="Number density contours",
         )
 
-    def bpt_config(self, title="Diagrama BPT", sfx=""):
+    def bpt_config(self, title="BPT Diagram", sfx=""):
         self.plot_KeKa()  # Linhas de separação teóricas
         plt.xlabel(r"$log_{10}$(%s[NII] / %sH$\alpha$)" % (sfx, sfx), fontsize="large")
         plt.ylabel(r"$log_{10}$(%s[OIII] / %sH$\beta$)" % (sfx, sfx), fontsize="large")
@@ -1830,7 +1831,6 @@ class PlotsMetricas(object):
         plt.xlim(-2, 1)
         plt.ylim(-1.5, 1.4)
         plt.grid(True, alpha=0.2)
-        plt.legend(loc="lower left", fontsize="small")
         plt.tight_layout()
 
     def bpt_pontos_reg(
