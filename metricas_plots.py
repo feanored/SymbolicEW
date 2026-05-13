@@ -367,8 +367,14 @@ class PlotsMetricas(object):
         )
         return model
 
+    def _r2_modelo(self, modelo, y_true, y_pred):
+        if hasattr(modelo, "stats_"):
+            return modelo.stats_["model_r2"]
+        from sklearn.metrics import r2_score
+        return r2_score(y_true, y_pred)
+
     # Gráficos da qualidade do ajuste das médias e desvios-padrão
-    def inspecao_modelos(self, modelos, dados_bins, col_x):
+    def inspecao_modelos(self, modelos, dados_bins, col_x, titulo="Operon"):
         if isinstance(col_x, list):
             X_bins = dados_bins[col_x]
         elif isinstance(col_x, str):
@@ -383,7 +389,7 @@ class PlotsMetricas(object):
 
         fig, axes = plt.subplots(4, 2, figsize=(12, 14))
         fig.suptitle(
-            "Qualidade dos Modelos Operon para Médias e Desvios-padrão: Predições vs Valores Reais",
+            f"Qualidade dos Modelos {titulo} para Médias e Desvios-padrão: Predições vs Valores Reais",
             fontsize=16,
             y=0.995,
         )
@@ -394,7 +400,7 @@ class PlotsMetricas(object):
             y_true_mean = dados_bins[f"{linha}_mean"].values
             X_for_pred = X_bins.values if isinstance(col_x, list) else X_bins
             y_pred_mean = modelos[f"{linha}_mean"].predict(X_for_pred)
-            r2_mean = modelos[f"{linha}_mean"].stats_["model_r2"]
+            r2_mean = self._r2_modelo(modelos[f"{linha}_mean"], y_true_mean, y_pred_mean)
             ax_mean.plot(
                 [y_true_mean.min(), y_true_mean.max()],
                 [y_true_mean.min(), y_true_mean.max()],
@@ -414,7 +420,7 @@ class PlotsMetricas(object):
             y_true_std = dados_bins[f"{linha}_std"].values
             X_for_pred = X_bins.values if isinstance(col_x, list) else X_bins
             y_pred_std = modelos[f"{linha}_std"].predict(X_for_pred)
-            r2_std = modelos[f"{linha}_std"].stats_["model_r2"]
+            r2_std = self._r2_modelo(modelos[f"{linha}_std"], y_true_std, y_pred_std)
             ax_std.plot(
                 [y_true_std.min(), y_true_std.max()],
                 [y_true_std.min(), y_true_std.max()],
@@ -431,7 +437,7 @@ class PlotsMetricas(object):
         plt.tight_layout()
 
     # Gráficos da qualidade do ajuste das covariâncias
-    def inspecao_modelos_covs(self, modelos, dados_bins, col_x):
+    def inspecao_modelos_covs(self, modelos, dados_bins, col_x, titulo="Operon"):
         if isinstance(col_x, list):
             X_bins = dados_bins[col_x]
         elif isinstance(col_x, str):
@@ -446,7 +452,7 @@ class PlotsMetricas(object):
 
         fig, axes = plt.subplots(3, 2, figsize=(12, 10.5))
         fig.suptitle(
-            "Qualidade dos Modelos Operon para Covariâncias: Predições vs Valores Reais",
+            f"Qualidade dos Modelos {titulo} para Covariâncias: Predições vs Valores Reais",
             fontsize=16,
             y=0.995,
         )
@@ -458,7 +464,7 @@ class PlotsMetricas(object):
             y_true_cov = dados_bins[f"cov_{l1}_{l2}"].values
             X_for_pred = X_bins.values if isinstance(col_x, list) else X_bins
             y_pred_cov = modelos[f"cov_{l1}_{l2}"].predict(X_for_pred)
-            r2_cov = modelos[f"cov_{l1}_{l2}"].stats_["model_r2"]
+            r2_cov = self._r2_modelo(modelos[f"cov_{l1}_{l2}"], y_true_cov, y_pred_cov)
 
             ax.scatter(y_true_cov, y_pred_cov, alpha=0.75, s=20, color="purple")
             ax.plot(
@@ -1472,7 +1478,7 @@ class PlotsMetricas(object):
         plt.legend()
         plt.show()
 
-    def salva_equacoes_html(self, modelos, title):
+    def salva_equacoes_operon(self, modelos, title):
         import contextlib
         from io import StringIO
 
@@ -1524,6 +1530,55 @@ class PlotsMetricas(object):
                     eq_text.replace("&", "&amp;")
                     .replace("<", "&lt;")
                     .replace(">", "&gt;")
+                )
+                f.write(f"<td><pre>{eq_html}</pre></td>\n")
+                f.write("</tr>\n")
+            f.write("</table></body></html>\n")
+        print()
+        print("-" * 80)
+        print(f"Escrito em {html_path}")
+
+    def salva_equacoes_pysr(self, modelos, title):
+        html_path = f"results/equacoes_pysr_{title}.html"
+        with open(html_path, "w") as f:
+            f.write("<html><head>\n")
+            f.write("<meta charset='utf-8'>\n")
+            f.write("<style>\n")
+            f.write(
+                "pre { white-space: pre-wrap; overflow-wrap: break-word; font-size: large }\n"
+            )
+            f.write("th { font-size: x-large } td { font-size: large }\n")
+            f.write("</style>\n")
+            f.write(
+                "</head><body style='background-color: darkslategray; color: lightgray;'>\n"
+            )
+            f.write(
+                "<h1>Equacoes dos modelos PySR para os estimadores da Normal</h1>\n"
+            )
+            f.write("<table border='1'>\n")
+            f.write(
+                "<tr>"
+                "<th>Modelo</th>"
+                "<th>Complex</th>"
+                "<th>MSE</th>"
+                "<th>Equacao</th>"
+                "</tr>\n"
+            )
+            for nome_modelo, modelo in modelos.items():
+                best = modelo.get_best()
+                complexy = best["complexity"]
+                mse_score = best["loss"]
+                eq_text = str(best["equation"])
+                eq_html = (
+                    eq_text.replace("&", "&amp;")
+                    .replace("<", "&lt;")
+                    .replace(">", "&gt;")
+                )
+                f.write("<tr>\n")
+                f.write(f"<td>{nome_modelo.upper()}</td>\n")
+                f.write(
+                    f"<td>{complexy}</td>"
+                    f"<td>{mse_score:.3e}</td>\n"
                 )
                 f.write(f"<td><pre>{eq_html}</pre></td>\n")
                 f.write("</tr>\n")

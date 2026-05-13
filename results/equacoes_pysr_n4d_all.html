@@ -1,0 +1,81 @@
+<html><head>
+<meta charset='utf-8'>
+<style>
+pre { white-space: pre-wrap; overflow-wrap: break-word; font-size: large }
+th { font-size: x-large } td { font-size: large }
+</style>
+</head><body style='background-color: darkslategray; color: lightgray;'>
+<h1>Equacoes dos modelos PySR para os estimadores da Normal</h1>
+<table border='1'>
+<tr><th>Modelo</th><th>Complex</th><th>MSE</th><th>Equacao</th></tr>
+<tr>
+<td>NII_6584_EW_MEAN</td>
+<td>30</td><td>8.678e-03</td>
+<td><pre>(x4 * 0.21189456) + ((exp(x0) * -0.00025772705) + (((((x1 - (-2.0854383 / x4)) - (exp(x0) * -0.0023061899)) - x3) / ((tanh(x2) * 0.7581277) + x0)) + -2.3931513))</pre></td>
+</tr>
+<tr>
+<td>HALPHA_EW_MEAN</td>
+<td>30</td><td>1.121e-02</td>
+<td><pre>(((x3 * -0.20462283) + -0.0426728) + tanh(tanh((x1 + tanh(tanh(tanh((x2 * -0.46628422) + -0.20138165)))) - x0) + ((x1 - (x4 + -0.64324796)) * -0.12858824))) + 0.8558325</pre></td>
+</tr>
+<tr>
+<td>OIII_5007_EW_MEAN</td>
+<td>30</td><td>1.533e-02</td>
+<td><pre>tanh(((x1 - x0) / (((x2 + ((x4 + x4) * 0.120784335)) / ((square(x3) + 0.65158504) / square((x1 - 7.2227435) * -0.35487053))) - (x5 * -0.14033096))) - 0.077111416)</pre></td>
+</tr>
+<tr>
+<td>HBETA_EW_MEAN</td>
+<td>30</td><td>6.878e-03</td>
+<td><pre>tanh(((tanh(tanh(tanh(x2 * 0.87277365))) * (square(tanh(exp(x3))) + (8.449434 - x1))) + tanh(9.555915 - x0)) * ((x4 + square(x3)) / (x0 - 0.080450594)))</pre></td>
+</tr>
+<tr>
+<td>NII_6584_EW_STD</td>
+<td>30</td><td>1.293e-03</td>
+<td><pre>((x1 / tanh(exp(((x4 - (x1 + -1.4487786)) - square(x5)) * (tanh(x2 * (x3 + x2)) + -0.14008144)) + tanh(tanh(tanh(x5))))) * 0.027349388) + -0.07374885</pre></td>
+</tr>
+<tr>
+<td>HALPHA_EW_STD</td>
+<td>24</td><td>1.854e-03</td>
+<td><pre>((x1 / x4) + (tanh(x2 + (square(((x0 + (1.4379317 + x2)) - x1) - tanh(x5)) + x2)) * 0.30211207)) / 4.0870533</pre></td>
+</tr>
+<tr>
+<td>OIII_5007_EW_STD</td>
+<td>29</td><td>3.439e-03</td>
+<td><pre>square((49.771538 + square(x1)) / ((tanh((1.94085 / 0.3583968) * (x3 - (x2 / 0.33883223))) * tanh(tanh(tanh(x2 * (x5 - x3))))) - x0)) / 674.109</pre></td>
+</tr>
+<tr>
+<td>HBETA_EW_STD</td>
+<td>30</td><td>1.938e-03</td>
+<td><pre>tanh(tanh(tanh((x1 + -6.8159537) / (((x4 + (-3.0225308 - (x1 - x4))) * tanh(((x2 + x3) + ((x5 * -1.3355178) - tanh(x5))) * x2)) + x4))))</pre></td>
+</tr>
+<tr>
+<td>COV_NII_6584_EW_HALPHA_EW</td>
+<td>26</td><td>2.472e-04</td>
+<td><pre>tanh(0.00054391235 * square((((1.697647 - square(x1)) / x4) - x2) - tanh(((x4 + x3) + ((x2 - x5) * 15.6967325)) - tanh(x1))))</pre></td>
+</tr>
+<tr>
+<td>COV_NII_6584_EW_OIII_5007_EW</td>
+<td>25</td><td>2.507e-04</td>
+<td><pre>(exp(tanh(tanh(tanh(tanh(x2) + (exp(tanh(tanh(x1 + (x4 + -19.202997)))) + -0.9612523))))) + square(tanh(x0 + -9.192887))) * 0.036709998</pre></td>
+</tr>
+<tr>
+<td>COV_NII_6584_EW_HBETA_EW</td>
+<td>26</td><td>1.820e-04</td>
+<td><pre>(x1 * ((x4 + x5) * ((tanh(tanh((x5 / -0.8017794) + (x2 + -0.07992798))) * (0.09354909 / square(x1))) + (0.021372281 / x4)))) - 0.120132044</pre></td>
+</tr>
+<tr>
+<td>COV_HALPHA_EW_OIII_5007_EW</td>
+<td>30</td><td>5.168e-04</td>
+<td><pre>tanh(tanh(tanh(tanh((-0.2865081 / (-1.1682148 - tanh(x0 - x1))) / (((((x3 + 1.1642823) * (((x5 + x5) - x3) - x3)) + x4) - x0) + x4)))))</pre></td>
+</tr>
+<tr>
+<td>COV_HALPHA_EW_HBETA_EW</td>
+<td>30</td><td>4.382e-04</td>
+<td><pre>tanh(tanh(tanh(tanh((exp(tanh((x2 + 0.054462537) + ((-1.7492039 - x3) * (x5 + square(x3))))) * 1.905839) / ((x4 - x1) + (x0 - x5))))) + -0.051109657)</pre></td>
+</tr>
+<tr>
+<td>COV_OIII_5007_EW_HBETA_EW</td>
+<td>30</td><td>4.816e-04</td>
+<td><pre>tanh(((x1 * 1.1017898) - x0) * (square(x1 / x4) * (0.24915716 / (((1.1653233 + x3) * ((x5 - x3) + (x5 - (x3 + exp(x2))))) + x0))))</pre></td>
+</tr>
+</table></body></html>
