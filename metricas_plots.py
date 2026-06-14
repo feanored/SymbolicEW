@@ -113,21 +113,21 @@ class PlotsMetricas(object):
         return train_test_split(X, y, test_size=0.2, random_state=RANDOM_SEED)
 
     # split for conformal regression
-    def split_conformal(self, dados, col_y, features):
-        from mapie.utils import train_conformalize_test_split
-        X = dados[features].values
-        y = dados[col_y].values
-        (X_train, X_conform, X_test, y_train, y_conform, y_test) = (
-            train_conformalize_test_split(
-                X,
-                y,
-                random_state=RANDOM_SEED,
-                train_size=0.6,
-                conformalize_size=0.2,
-                test_size=0.2,
-            )
-        )
-        return X_train, X_conform, X_test, y_train, y_conform, y_test
+    # def split_conformal(self, dados, col_y, features):
+    #     from mapie.utils import train_conformalize_test_split
+    #     X = dados[features].values
+    #     y = dados[col_y].values
+    #     (X_train, X_conform, X_test, y_train, y_conform, y_test) = (
+    #         train_conformalize_test_split(
+    #             X,
+    #             y,
+    #             random_state=RANDOM_SEED,
+    #             train_size=0.6,
+    #             conformalize_size=0.2,
+    #             test_size=0.2,
+    #         )
+    #     )
+    #     return X_train, X_conform, X_test, y_train, y_conform, y_test
 
     # gráficos de correlações multiplas
     def plot_corr(
