@@ -18,8 +18,6 @@ from scipy.stats.qmc import LatinHypercube
 from scipy.stats import multivariate_normal
 from sklearn.linear_model import QuantileRegressor
 from sklearn.model_selection import train_test_split
-import pyoperon.pyoperon as op
-from pyoperon.sklearn import SymbolicRegressor
 import warnings
 
 warnings.filterwarnings("ignore")
@@ -113,21 +111,21 @@ class PlotsMetricas(object):
         return train_test_split(X, y, test_size=0.2, random_state=RANDOM_SEED)
 
     # split for conformal regression
-    def split_conformal(self, dados, col_y, features):
-        from mapie.utils import train_conformalize_test_split
-        X = dados[features].values
-        y = dados[col_y].values
-        (X_train, X_conform, X_test, y_train, y_conform, y_test) = (
-            train_conformalize_test_split(
-                X,
-                y,
-                random_state=RANDOM_SEED,
-                train_size=0.6,
-                conformalize_size=0.2,
-                test_size=0.2,
-            )
-        )
-        return X_train, X_conform, X_test, y_train, y_conform, y_test
+    # def split_conformal(self, dados, col_y, features):
+    #     from mapie.utils import train_conformalize_test_split
+    #     X = dados[features].values
+    #     y = dados[col_y].values
+    #     (X_train, X_conform, X_test, y_train, y_conform, y_test) = (
+    #         train_conformalize_test_split(
+    #             X,
+    #             y,
+    #             random_state=RANDOM_SEED,
+    #             train_size=0.6,
+    #             conformalize_size=0.2,
+    #             test_size=0.2,
+    #         )
+    #     )
+    #     return X_train, X_conform, X_test, y_train, y_conform, y_test
 
     # gráficos de correlações multiplas
     def plot_corr(
@@ -262,6 +260,7 @@ class PlotsMetricas(object):
     def operon_regression(
         self, X_train, y_train, selection="minimum_description_length"
     ):
+        from pyoperon.sklearn import SymbolicRegressor
         # Treinar o modelo
         model = SymbolicRegressor(
             random_state=RANDOM_SEED,
@@ -292,6 +291,7 @@ class PlotsMetricas(object):
 
     # Treinar Operon passando configuração
     def treinar_operon(self, operon_config, X, y, plot=False):
+        from pyoperon.sklearn import SymbolicRegressor
         modelo = SymbolicRegressor(**operon_config)
         modelo.fit(X, y)
         for model in modelo.pareto_front_:
@@ -563,7 +563,7 @@ class PlotsMetricas(object):
             plt.scatter(
                 dados[T.nii_ha.value],
                 dados[T.oiii_hb.value],
-                color="#7FD6AB",
+                color="red",
                 alpha=0.8,
                 s=5,
                 edgecolors="none",
@@ -600,7 +600,7 @@ class PlotsMetricas(object):
             plt.scatter(
                 dados[T.nii_ha.value],
                 dados[T.ha.value],
-                color="#7FD6AB",
+                color="red",
                 alpha=0.8,
                 s=5,
                 edgecolors="none",
@@ -1865,14 +1865,13 @@ class PlotsMetricas(object):
         else:
             X, Y, Z, _ = self.get_densities(dados_x, dados_y)
             lvls = [0.24204035, 0.46083535, 1.138656, 1.85108968]  # bpt dados reais
-        plt.contour(X, Y, Z, colors="purple", alpha=0.5, levels=lvls)
+        plt.contour(X, Y, Z, colors="black", levels=lvls)
         # sns.kdeplot(x=dados_x, y=dados_y, cmap=cor, fill=False, levels=(0.1, 0.2, 0.4, 0.6))
         plt.plot(
             [],
             [],
             "-",
-            color="purple",
-            alpha=0.5,
+            color="black",
             linewidth=1,
             label="Níveis de densidade numérica",
         )
@@ -2332,12 +2331,17 @@ class OperonModelWrapper:
 
     def _rebuild_model(self):
         """Reconstrói o objeto Tree a partir dos nós serializados."""
+        import pyoperon.pyoperon as op
         tree = op.Tree(self._nodes)
         tree.UpdateNodes()
         tree.SetCoefficients(np.array(self.coefficients, dtype=np.float32))
         return tree
 
     def predict(self, X):
+        from pyoperon.sklearn import SymbolicRegressor
+        X = np.array(X, dtype=np.float64)
+        if X.ndim == 1:
+            X = X.reshape(-1, 1)
         tree = self._rebuild_model()
         model = SymbolicRegressor()
         model.model_ = tree

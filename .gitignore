@@ -185,3 +185,5 @@ cython_debug/
 results/*.gz
 /outputs
 .DS_Store
+*.parquet
+/results/pareto_combos/*.png

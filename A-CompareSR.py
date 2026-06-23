@@ -476,7 +476,7 @@ def gerar_diagramas(algo):
             df_amostras[t],
             r"%s, $D_{KL}$ = %.4f" % (p.unidades[t], kl),
             ax, bins=bins, lim=(-1, 2.5),
-            cor="lightgreen", lbl="Sample",
+            cor="red", lbl="Sample",
         )
 
     plt.tight_layout()
@@ -538,4 +538,7 @@ def avaliar_amostras(algo):
 
 if __name__ == "__main__":
     # histogramas_validation()
-    run_comparison(pysr="train", operon=True, rf=True, eggp=False)
+    # run_comparison(pysr="train", operon=True, rf=True)
+    gerar_diagramas("RandomForest")
+    gerar_diagramas("Operon")
+    gerar_diagramas("PySR")
