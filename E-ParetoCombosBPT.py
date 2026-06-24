@@ -129,9 +129,31 @@ def plot_combo_bpt(preds, y_test, complexities, r2s, save_path):
 
     # --- BPT panel ---
     plt.sca(ax_bpt)
-    plt.scatter(nii_ha, oiii_hb, color="red", alpha=0.8, s=5, edgecolors="none")
+
+    nii_ha_true = y_test[:, 0] - y_test[:, 1]
+    oiii_hb_true = y_test[:, 2] - y_test[:, 3]
+    ax_bpt.scatter(
+        nii_ha_true,
+        oiii_hb_true,
+        color="blue",
+        alpha=0.25,
+        s=5,
+        edgecolors="none",
+        zorder=1,
+        label="Validation Set"
+    )
+    ax_bpt.scatter(
+        nii_ha,
+        oiii_hb,
+        color="red",
+        alpha=0.8,
+        s=5,
+        edgecolors="none",
+        zorder=2,
+        label="Sampled Set"
+    )
     # p.curvas_densidade(nii_ha, oiii_hb)
-    
+
     p.plot_KeKa()
     ax_bpt.set_xlabel(r"$\log_{10}$(EW[NII] / EWH$\alpha$)", fontsize="large")
     ax_bpt.set_ylabel(r"$\log_{10}$(EW[OIII] / EWH$\beta$)", fontsize="large")
@@ -211,10 +233,10 @@ def run_pareto_combos(complexities=[10, 50]):
 
     df_results = pd.DataFrame(all_rows)
     df_results = df_results.sort_values("mse_total")
-    df_results.to_csv(f"{OUTPUT_DIR}/combo_mse_summary.csv", index=False)
+    df_results.to_csv(f"{OUTPUT_DIR}/mse_summary.csv", index=False)
 
     print(f"\nConcluído! {n_combos} diagramas gerados.")
-    print(f"Resumo de MSEs salvo em {OUTPUT_DIR}/combo_mse_summary.csv")
+    print(f"Resumo de MSEs salvo em {OUTPUT_DIR}/mse_summary.csv")
     print("\nTop 5 combinações por MSE total:")
     df_ranked = df_results.reset_index(drop=True)
     print(df_ranked[["combo", "mse_total"]].head().to_string(index=False))

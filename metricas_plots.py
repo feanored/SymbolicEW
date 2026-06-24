@@ -557,20 +557,35 @@ class PlotsMetricas(object):
         title="Dados reais da síntese",
         densities=False,
         show=True,
+        known_x=None,
+        known_y=None,
     ):
+        plt.figure(figsize=(8.4, 7))
+        ax = plt.gca()
+        if known_x is not None and known_y is not None:
+            ax.scatter(
+                known_x,
+                known_y,
+                color="blue",
+                alpha=0.15,
+                s=6,
+                edgecolors="none",
+                zorder=1,
+                label="Validation Set"
+            )
         if color is None:
-            plt.figure(figsize=(8.4, 7))
-            plt.scatter(
+            ax.scatter(
                 dados[T.nii_ha.value],
                 dados[T.oiii_hb.value],
                 color="red",
                 alpha=0.8,
                 s=5,
                 edgecolors="none",
+                zorder=2,
+                label="Sampled Set"
             )
         else:
-            plt.figure(figsize=(10, 7))
-            scatter = plt.scatter(
+            scatter = ax.scatter(
                 dados[T.nii_ha.value],
                 dados[T.oiii_hb.value],
                 c=dados[color],
@@ -578,6 +593,8 @@ class PlotsMetricas(object):
                 s=5,
                 cmap="coolwarm",
                 edgecolors="none",
+                zorder=2,
+                label="Sampled Set"
             )
             cbar = plt.colorbar(scatter)
             cbar.set_label(color, rotation=90, labelpad=2)
@@ -594,20 +611,35 @@ class PlotsMetricas(object):
         title="Dados reais da síntese",
         densities=False,
         show=True,
+        known_x=None,
+        known_y=None,
     ):
+        plt.figure(figsize=(8.4, 7))
+        ax = plt.gca()
+        if known_x is not None and known_y is not None:
+            ax.scatter(
+                known_x,
+                known_y,
+                color="blue",
+                alpha=0.15,
+                s=6,
+                edgecolors="none",
+                zorder=1,
+                label="Validation Set"
+            )
         if color is None:
-            plt.figure(figsize=(8.4, 7))
-            plt.scatter(
+            ax.scatter(
                 dados[T.nii_ha.value],
                 dados[T.ha.value],
                 color="red",
                 alpha=0.8,
                 s=5,
                 edgecolors="none",
+                zorder=2,
+                label="Sampled Set"
             )
         else:
-            plt.figure(figsize=(10, 7))
-            scatter = plt.scatter(
+            scatter = ax.scatter(
                 dados[T.nii_ha.value],
                 dados[T.ha.value],
                 c=dados[color],
@@ -615,6 +647,8 @@ class PlotsMetricas(object):
                 s=5,
                 cmap="coolwarm",
                 edgecolors="none",
+                zorder=2,
+                label="Sampled Set"
             )
             cbar = plt.colorbar(scatter)
             cbar.set_label(color, rotation=90, labelpad=2)

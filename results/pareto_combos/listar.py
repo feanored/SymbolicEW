@@ -4,7 +4,7 @@ import numpy as np
 from natsort import natsorted
 from PIL import Image # pip install pillow
 
-pasta = "."
+pasta = "results/pareto_combos"
 imagens = natsorted([f for f in os.listdir(pasta) if f.endswith('.png')])
 
 # Renomear
@@ -31,11 +31,12 @@ def video():
 # Gerar um gif
 def gif():
     image_files = natsorted([os.path.join(pasta, f) for f in os.listdir(pasta) if (f.endswith(('.png')) and np.random.random() < 0.2)])
+    print("%d imagens selecionadas." % len(image_files))
     images = [Image.open(img).convert('RGBA') for img in image_files]
     images[0].save(os.path.join(pasta, "output.gif"), save_all=True, append_images=images[1:], duration=500, loop=0)
     print(f"✅ GIF gerado com sucesso!")
 
 if __name__ == "__main__":
     rename()
-    # video()
+    #video()
     gif()

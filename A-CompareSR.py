@@ -470,13 +470,13 @@ def gerar_diagramas(algo):
         p.histogram_v(
             y_test[t],
             "", ax, bins=bins, lim=(-1, 2.5),
-            cor="darkblue", lbl="Test Set",
+            cor="darkblue", lbl="Validation Set",
         )
         p.histogram_v(
             df_amostras[t],
             r"%s, $D_{KL}$ = %.4f" % (p.unidades[t], kl),
             ax, bins=bins, lim=(-1, 2.5),
-            cor="red", lbl="Sample",
+            cor="red", lbl="Sampled Set",
         )
 
     plt.tight_layout()
@@ -484,10 +484,26 @@ def gerar_diagramas(algo):
     plt.close()
 
     # Diagramas
-    p.show_bpt(df_amostras, title=f"Amostras do {algo}", densities=True, show=False)
+    known_x_bpt = y_test[T.nii.value] - y_test[T.ha.value]
+    known_y_bpt = y_test[T.oiii.value] - y_test[T.hb.value]
+    p.show_bpt(
+        df_amostras,
+        title=f"Amostras do {algo}",
+        densities=True,
+        show=False,
+        known_x=known_x_bpt,
+        known_y=known_y_bpt,
+    )
     plt.savefig(f"results/compare_sr/bpt_{algo}.png")
     plt.close()
-    p.show_whan(df_amostras, title=f"Amostras do {algo}", densities=True, show=False)
+    p.show_whan(
+        df_amostras,
+        title=f"Amostras do {algo}",
+        densities=True,
+        show=False,
+        known_x=known_x_bpt,
+        known_y=y_test[T.ha.value],
+    )
     plt.savefig(f"results/compare_sr/whan_{algo}.png")
     plt.close()
 
