@@ -235,4 +235,4 @@ def run_pareto_combos(complexities=[10, 50]):
 
 
 if __name__ == "__main__":
-    run_pareto_combos([43, 49])
+    run_pareto_combos([38, 47])
