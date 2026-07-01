@@ -13,7 +13,7 @@ import matplotlib.pyplot as plt
 from sklearn.preprocessing import StandardScaler
 from sklearn.model_selection import train_test_split
 from sklearn.metrics import mean_squared_error, r2_score
-from metricas_plots import PlotsMetricas, T, F
+from metricas_plots import PlotsMetricas, T, F, calcula_ocupacao_bpt
 
 np.seterr(all="ignore")
 p = PlotsMetricas()
@@ -568,31 +568,6 @@ def gerar_diagramas(algo):
     )
     plt.savefig(f"results/compare_sr/whan_{algo}.png")
     plt.close()
-
-
-# Classifica pontos do diagrama BPT em SF / Composite / AGN usando as
-# mesmas curvas Ke01 e Ka03 exibidas em p.plot_KeKa().
-def classifica_bpt(nii_ha, oiii_hb):
-    x = np.asarray(nii_ha, dtype=float)
-    y = np.asarray(oiii_hb, dtype=float)
-    with np.errstate(all="ignore"):
-        ka_03 = 0.61 / (x - 0.05) + 1.3
-        ke_01 = 0.61 / (x - 0.47) + 1.19
-
-    sf = (x < 0.05) & (y < ka_03)
-    agn = (x >= 0.47) | (~sf & (y >= ke_01))
-    composite = ~sf & ~agn
-
-    labels = np.full(x.shape, "AGN", dtype=object)
-    labels[composite] = "Composite"
-    labels[sf] = "SF"
-    return labels
-
-
-def calcula_ocupacao_bpt(nii_ha, oiii_hb):
-    labels = classifica_bpt(nii_ha, oiii_hb)
-    total = labels.size
-    return {classe: 100 * np.sum(labels == classe) / total for classe in ("SF", "Composite", "AGN")}
 
 
 def gerar_tabela_ocupacao_bpt(algoritmos=None):

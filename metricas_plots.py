@@ -16,6 +16,7 @@ import plotly.graph_objects as go
 import plotly.express as px
 import plotly.io as pio
 from scipy import stats
+import scipy.linalg as la
 from scipy.special import gammaln
 from scipy.optimize import minimize
 from scipy.stats.qmc import LatinHypercube
@@ -59,6 +60,166 @@ class F(Enum):
 
 
 # --------------------------------------------------------------------------------------------------
+# Testes de multinormalidade (Mardia 1970 e Henze-Zirkler 1990)
+
+
+def mardia_test(X, alpha=0.05):
+    """
+    Testa multinormalidade via assimetria (b1p) e curtose (b2p) de Mardia.
+
+    Assimetria: H0 rejeitada se (n/6)*b1p > χ²_{p(p+1)(p+2)/6, α}
+    Curtose:    H0 rejeitada se |z| > z_{α/2}
+    """
+    X = np.asarray(X, dtype=float)
+    n, p = X.shape
+
+    mu = X.mean(axis=0)
+    Xc = X - mu
+    S = Xc.T @ Xc / n  # covariância MLE (não-centrada)
+    try:
+        S_inv = la.inv(S)
+    except la.LinAlgError:
+        S_inv = la.pinv(S)
+
+    G = Xc @ S_inv @ Xc.T  # G[i,j] = (x_i-μ)'S⁻¹(x_j-μ)
+    d = np.diag(G)  # Mahalanobis² de cada ponto
+
+    # Assimetria
+    b1p = float(np.sum(G**3) / n**2)
+    df_sk = p * (p + 1) * (p + 2) / 6
+    kappa = n * b1p / 6
+    p_skew = float(1 - stats.chi2.cdf(kappa, df=df_sk))
+
+    # Curtose
+    b2p = float(np.sum(d**2) / n)
+    mu_b2 = p * (p + 2)
+    z_kurt = float((b2p - mu_b2) / np.sqrt(8 * p * (p + 2) / n))
+    p_kurt = float(2 * (1 - stats.norm.cdf(abs(z_kurt))))
+
+    return dict(
+        b1p=b1p, kappa=kappa, df_skew=df_sk, p_skew=p_skew,
+        b2p=b2p, z_kurt=z_kurt, p_kurt=p_kurt,
+        normal_skew=p_skew > alpha, normal_kurt=p_kurt > alpha,
+    )
+
+
+def hz_test(X, alpha=0.05):
+    """
+    Henze-Zirkler (1990): estatística T_{n,β} com p-valor aproximado
+    via distribuição log-normal (Henze & Zirkler 1990, Eqs. 3.4-3.5).
+    """
+    X = np.asarray(X, dtype=float)
+    n, p = X.shape
+
+    mu = X.mean(axis=0)
+    Xc = X - mu
+    S = np.cov(Xc.T, bias=True)
+    try:
+        S_inv = la.inv(S)
+    except la.LinAlgError:
+        S_inv = la.pinv(S)
+
+    Dj = np.sum(Xc @ S_inv * Xc, axis=1)  # Mahalanobis² de cada ponto
+    Y = Xc @ S_inv @ Xc.T
+    Djk = -2 * Y + Dj[:, None] + Dj[None, :]  # (n×n) distâncias² par-a-par
+
+    beta = (1 / np.sqrt(2)) * ((2 * p + 1) / 4) ** (1 / (p + 4)) * n ** (1 / (p + 4))
+    b2 = beta**2  # β²
+
+    if np.linalg.matrix_rank(S) == p:
+        HZ = n * (
+            np.sum(np.exp(-b2 / 2 * Djk)) / n**2
+            - 2 * (1 + b2) ** (-p / 2) * np.sum(np.exp(-b2 / (2 * (1 + b2)) * Dj)) / n
+            + (1 + 2 * b2) ** (-p / 2)
+        )
+    else:
+        HZ = n * 4
+
+    # Momentos sob H0 para aproximação log-normal
+    a = 1 + 2 * b2
+    wb = (1 + b2) * (1 + 3 * b2)
+    mu_T = 1 - a ** (-p / 2) * (
+        1 + p * b2 / a + p * (p + 2) * b2**2 / (2 * a**2)
+    )
+    var_T = (
+        2 * (1 + 4 * b2) ** (-p / 2)
+        + 2 * a ** (-p) * (
+            1 + 2 * p * b2**2 / a**2 + 3 * p * (p + 2) * b2**4 / (4 * a**4)
+        )
+        - 4 * wb ** (-p / 2) * (
+            1 + 3 * p * b2**2 / (2 * wb) + p * (p + 2) * b2**4 / (2 * wb**2)
+        )
+    )
+
+    log_mu = float(np.log(np.sqrt(mu_T**4 / (var_T + mu_T**2))))
+    log_s = float(np.sqrt(np.log((var_T + mu_T**2) / mu_T**2)))
+    p_val = float(stats.lognorm.sf(HZ, log_s, scale=np.exp(log_mu)))
+
+    return dict(HZ=float(HZ), p_value=p_val, normal=bool(p_val > alpha))
+
+
+# --------------------------------------------------------------------------------------------------
+# Classificação de regiões do diagrama BPT (Ke01 + Ka03, ver PlotsMetricas.plot_KeKa)
+
+
+def classifica_bpt(nii_ha, oiii_hb):
+    """Classifica pontos do diagrama BPT em SF / Composite / AGN usando as
+    mesmas curvas Ke01 e Ka03 exibidas em PlotsMetricas.plot_KeKa()."""
+    x = np.asarray(nii_ha, dtype=float)
+    y = np.asarray(oiii_hb, dtype=float)
+    with np.errstate(all="ignore"):
+        ka_03 = 0.61 / (x - 0.05) + 1.3
+        ke_01 = 0.61 / (x - 0.47) + 1.19
+
+    sf = (x < 0.05) & (y < ka_03)
+    agn = (x >= 0.47) | (~sf & (y >= ke_01))
+    composite = ~sf & ~agn
+
+    labels = np.full(x.shape, "AGN", dtype=object)
+    labels[composite] = "Composite"
+    labels[sf] = "SF"
+    return labels
+
+
+def calcula_ocupacao_bpt(nii_ha, oiii_hb):
+    """Percentual de pontos em cada região do BPT (SF / Composite / AGN)."""
+    labels = classifica_bpt(nii_ha, oiii_hb)
+    total = labels.size
+    return {classe: 100 * np.sum(labels == classe) / total for classe in ("SF", "Composite", "AGN")}
+
+
+def tabela_ocupacao_bpt(conjuntos):
+    """conjuntos: dict {nome: (nii_ha, oiii_hb)} -> DataFrame indexado por nome
+    com colunas SF/Composite/AGN (percentuais de ocupação do BPT)."""
+    linhas = [
+        {"conjunto": nome, **calcula_ocupacao_bpt(nii_ha, oiii_hb)}
+        for nome, (nii_ha, oiii_hb) in conjuntos.items()
+    ]
+    return pd.DataFrame(linhas).set_index("conjunto")[["SF", "Composite", "AGN"]]
+
+
+def plot_ocupacao_bpt(df_ocupacao, titulo="Ocupação das regiões do diagrama BPT", ax=None):
+    """Barras horizontais 100% empilhadas (mesma área total) comparando a
+    ocupação SF/Composite/AGN entre os conjuntos indexados em df_ocupacao."""
+    cores = {"SF": "royalblue", "Composite": "seagreen", "AGN": "firebrick"}
+    if ax is None:
+        _, ax = plt.subplots(figsize=(9, 0.6 * len(df_ocupacao) + 1.5))
+    esquerda = np.zeros(len(df_ocupacao))
+    for classe in ["SF", "Composite", "AGN"]:
+        ax.barh(
+            df_ocupacao.index,
+            df_ocupacao[classe],
+            left=esquerda,
+            color=cores[classe],
+            label=classe,
+        )
+        esquerda += df_ocupacao[classe].values
+    ax.set_xlim(0, 100)
+    ax.set_xlabel("Ocupação (%)", fontsize="large")
+    ax.set_title(titulo, fontsize="x-large", pad=40)
+    ax.invert_yaxis()
+    ax.legend(loc="lower center", bbox_to_anchor=(0.5, 1.02), ncol=3, fontsize="medium")
+    return ax
 
 
 class PlotsMetricas(object):
@@ -2290,6 +2451,7 @@ class PlotsMetricas(object):
 
             # Stats dos targets na célula
             for t, tcol in enumerate(targets):
+                row[f"{tcol}_median"] = np.median(Y_cell[:, t])
                 row[f"{tcol}_mean"] = Y_cell[:, t].mean()
                 row[f"{tcol}_std"]  = Y_cell[:, t].std()
 
@@ -2301,8 +2463,16 @@ class PlotsMetricas(object):
                         if j > i:  # upper triangle
                             row[f"cov_{t1}_{t2}"] = cov[i, j]
 
+            # Testes de multinormalidade da célula: distribuição conjunta
+            # dos valores originais dos targets (ex: as 4 EWs) na vizinhança
+            if len(targets) > 1:
+                mardia = mardia_test(Y_cell)
+                row["p_mardia_skew"] = mardia["p_skew"]
+                row["p_mardia_kurt"] = mardia["p_kurt"]
+                row["p_hz"] = hz_test(Y_cell)["p_value"]
+
             # Tamanho da célula
-            row["cell_size"] = k
+            row["cell_size"] = len(Y_cell)
 
             records.append(row)
 
