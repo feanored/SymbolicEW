@@ -4,7 +4,11 @@ import sympy as sp
 import numpy as np
 import pandas as pd
 from datetime import datetime
-import smplotlib  # type: ignore
+import logging
+logging.getLogger('matplotlib.font_manager').setLevel(logging.ERROR)
+import matplotlib
+matplotlib.use('Agg')
+import smplotlib # type: ignore
 import matplotlib.pyplot as plt
 from sklearn.preprocessing import StandardScaler
 from sklearn.model_selection import train_test_split
@@ -65,6 +69,16 @@ eggp_config = {
         "nTournament": 5,
         "nonterminals": "add,sub,mul,div,square,exp,tanh",
         "loss": "MSE",
+    },
+}
+
+gmm_config = {
+    "algorithm": "GaussianMixture",
+    # n_components por linha, na ordem: nii, ha, oiii, hb
+    "n_components": [4, 5, 6, 5],
+    "kwargs": {
+        "covariance_type": "tied",
+        "random_state": 4321,
     },
 }
 
@@ -139,6 +153,25 @@ def read_pysr_models(config, targets, prefix=""):
             run_directory=f"results/pysr/{prefix}{target}",
             model_selection=config["kwargs"]["model_selection"],
         )
+        elapsed = time.perf_counter() - start
+        elapseds.append(elapsed)
+        models.append(model)
+    return models, elapseds
+
+
+def train_gmm_models(X_train, y_train, config):
+    from sklearn.mixture import GaussianMixture
+
+    gmm_kwargs = config["kwargs"]
+    n_components = config["n_components"]
+    rng = np.random.default_rng(gmm_kwargs.get("random_state", 4321))
+    models = []
+    elapseds = []
+    for i in range(y_train.shape[1]):
+        start = time.perf_counter()
+        model = GaussianMixture(n_components=n_components[i], **gmm_kwargs)
+        model.fit(y_train[:, i].reshape(-1, 1))
+        model.rng_ = rng
         elapsed = time.perf_counter() - start
         elapseds.append(elapsed)
         models.append(model)
@@ -232,6 +265,9 @@ def evaluate_models(
             best = model.results.iloc[-1]
             complexy = best.size
             equations = best.Expression
+        elif algorithm == "GaussianMixture":
+            complexy = model.n_components
+            equations = "N/A"
 
         # Exibe gráfico real X predito
         plt.subplots(figsize=(7, 7))
@@ -293,7 +329,14 @@ def eggp_predict(model, X):
     return model.predict(X)
 
 
-def run_comparison(pysr=None, operon=False, rf=False, eggp=False):
+def gmm_predict(model, X):
+    samples, _ = model.sample(X.shape[0])
+    samples = samples.flatten()
+    model.rng_.shuffle(samples)
+    return samples
+
+
+def run_comparison(pysr=None, operon=False, rf=False, eggp=False, gmm=False):
     os.makedirs("results/compare_sr", exist_ok=True)
 
     print("\n Carregando dados...")
@@ -372,6 +415,25 @@ def run_comparison(pysr=None, operon=False, rf=False, eggp=False):
         gerar_diagramas("egGP")
         combinar_fits("egGP")
 
+    if gmm:
+        print("\n Treinando GaussianMixture...")
+        gmm_models, elapsed = train_gmm_models(X_train_scaled, y_train, gmm_config)
+        results_rows.extend(
+            evaluate_models(
+                gmm_models,
+                gmm_predict,
+                X_train_scaled,
+                X_test_scaled,
+                y_train,
+                y_test,
+                "GaussianMixture",
+                targets,
+                elapsed,
+            )
+        )
+        gerar_diagramas("GaussianMixture")
+        combinar_fits("GaussianMixture")
+
     if pysr is not None:
         print("\n Treinando PySR...")
         if pysr == "train":
@@ -397,7 +459,7 @@ def run_comparison(pysr=None, operon=False, rf=False, eggp=False):
             gerar_diagramas("PySR")
             combinar_fits("PySR")
 
-    if rf or operon or eggp or (pysr is not None and pysr != "read"):
+    if rf or operon or eggp or gmm or (pysr is not None and pysr != "read"):
         df_results = pd.DataFrame(results_rows)
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
         output_path = os.path.join("results/compare_sr", f"results_{timestamp}.csv")
@@ -508,6 +570,82 @@ def gerar_diagramas(algo):
     plt.close()
 
 
+# Classifica pontos do diagrama BPT em SF / Composite / AGN usando as
+# mesmas curvas Ke01 e Ka03 exibidas em p.plot_KeKa().
+def classifica_bpt(nii_ha, oiii_hb):
+    x = np.asarray(nii_ha, dtype=float)
+    y = np.asarray(oiii_hb, dtype=float)
+    with np.errstate(all="ignore"):
+        ka_03 = 0.61 / (x - 0.05) + 1.3
+        ke_01 = 0.61 / (x - 0.47) + 1.19
+
+    sf = (x < 0.05) & (y < ka_03)
+    agn = (x >= 0.47) | (~sf & (y >= ke_01))
+    composite = ~sf & ~agn
+
+    labels = np.full(x.shape, "AGN", dtype=object)
+    labels[composite] = "Composite"
+    labels[sf] = "SF"
+    return labels
+
+
+def calcula_ocupacao_bpt(nii_ha, oiii_hb):
+    labels = classifica_bpt(nii_ha, oiii_hb)
+    total = labels.size
+    return {classe: 100 * np.sum(labels == classe) / total for classe in ("SF", "Composite", "AGN")}
+
+
+def gerar_tabela_ocupacao_bpt(algoritmos=None):
+    if algoritmos is None:
+        algoritmos = ["RandomForest", "Operon", "PySR", "GaussianMixture"]
+
+    df = pd.read_csv("dados/ariel_limpo_log10.csv.gz", compression="gzip")
+    features, targets = get_feature_target_names()
+    _, y_test = train_test_split(df[features + targets], test_size=0.3, random_state=4321)
+    nii_ha_val = y_test[T.nii.value] - y_test[T.ha.value]
+    oiii_hb_val = y_test[T.oiii.value] - y_test[T.hb.value]
+
+    linhas = [{"modelo": "Validation Set", **calcula_ocupacao_bpt(nii_ha_val, oiii_hb_val)}]
+
+    for algo in algoritmos:
+        path = f"results/compare_sr/amostras_{algo}.csv"
+        if not os.path.exists(path):
+            print(f"Aviso: {path} nao encontrado, pulando {algo}.")
+            continue
+        df_amostras = pd.read_csv(path)
+        ocupacao = calcula_ocupacao_bpt(
+            df_amostras[T.nii_ha.value], df_amostras[T.oiii_hb.value]
+        )
+        linhas.append({"modelo": algo, **ocupacao})
+
+    df_ocupacao = pd.DataFrame(linhas).set_index("modelo")[["SF", "Composite", "AGN"]]
+    df_ocupacao.to_csv("results/compare_sr/bpt_ocupacao.csv")
+
+    # Grafico de barras empilhadas (100% em cada barra, mesma area total)
+    cores = {"SF": "royalblue", "Composite": "seagreen", "AGN": "firebrick"}
+    _, ax = plt.subplots(figsize=(9, 0.6 * len(df_ocupacao) + 1.5))
+    esquerda = np.zeros(len(df_ocupacao))
+    for classe in ["SF", "Composite", "AGN"]:
+        ax.barh(
+            df_ocupacao.index,
+            df_ocupacao[classe],
+            left=esquerda,
+            color=cores[classe],
+            label=classe,
+        )
+        esquerda += df_ocupacao[classe].values
+    ax.set_xlim(0, 100)
+    ax.set_xlabel("Occupation (%)", fontsize="large")
+    ax.set_title("BPT relative occupation", fontsize="x-large", pad=40)
+    ax.invert_yaxis()
+    ax.legend(loc="lower center", bbox_to_anchor=(0.5, 0.92), ncol=3, fontsize="medium")
+    plt.tight_layout()
+    plt.savefig("results/compare_sr/bpt_ocupacao.png")
+    plt.close()
+
+    return df_ocupacao
+
+
 def combinar_fits(algorithm):
     from PIL import Image
 
@@ -554,7 +692,9 @@ def avaliar_amostras(algo):
 
 if __name__ == "__main__":
     # histogramas_validation()
-    # run_comparison(pysr="train", operon=True, rf=True)
-    gerar_diagramas("RandomForest")
-    gerar_diagramas("Operon")
-    gerar_diagramas("PySR")
+    # run_comparison(pysr="train", operon=True, rf=True, gmm=True)
+    #gerar_diagramas("RandomForest")
+    #gerar_diagramas("Operon")
+    #gerar_diagramas("PySR")
+    #gerar_diagramas("GaussianMixture")
+    gerar_tabela_ocupacao_bpt()

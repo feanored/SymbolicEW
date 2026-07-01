@@ -6,7 +6,11 @@ from enum import Enum
 from IPython.display import display, Latex
 from types import SimpleNamespace as Struct
 import seaborn as sns
-import smplotlib  # type: ignore
+import logging
+logging.getLogger('matplotlib.font_manager').setLevel(logging.ERROR)
+import matplotlib
+matplotlib.use('Agg')
+import smplotlib # type: ignore
 import matplotlib.pyplot as plt
 import plotly.graph_objects as go
 import plotly.express as px
