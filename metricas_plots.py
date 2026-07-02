@@ -724,9 +724,33 @@ class PlotsMetricas(object):
         show=True,
         known_x=None,
         known_y=None,
+        background_x=None,
+        background_y=None,
+        background_label="train",
     ):
         plt.figure(figsize=(8.4, 7))
         ax = plt.gca()
+        alpha = 0.8
+        if background_x is not None and background_y is not None:
+            ax.scatter(
+                background_x,
+                background_y,
+                color="gray",
+                alpha=0.1,
+                s=4,
+                edgecolors="none",
+                zorder=0,
+                label=background_label,
+            )
+            alpha = 0.4
+            if densities:
+                self.curvas_densidade(
+                    background_x,
+                    background_y,
+                    cor="dimgray",
+                    linestyle="--",
+                    label=f"Níveis de densidade ({background_label})",
+                )
         if known_x is not None and known_y is not None:
             ax.scatter(
                 known_x,
@@ -743,7 +767,7 @@ class PlotsMetricas(object):
                 dados[T.nii_ha.value],
                 dados[T.oiii_hb.value],
                 color="red",
-                alpha=0.8,
+                alpha=alpha,
                 s=5,
                 edgecolors="none",
                 zorder=2,
@@ -754,7 +778,7 @@ class PlotsMetricas(object):
                 dados[T.nii_ha.value],
                 dados[T.oiii_hb.value],
                 c=dados[color],
-                alpha=0.8,
+                alpha=alpha,
                 s=5,
                 cmap="coolwarm",
                 edgecolors="none",
@@ -2057,22 +2081,25 @@ class PlotsMetricas(object):
         plt.legend(loc="upper right", fontsize="small")
         plt.tight_layout()
 
-    def curvas_densidade(self, dados_x, dados_y, levels=True):
+    def curvas_densidade(
+        self, dados_x, dados_y, levels=True, cor="black", linestyle="-",
+        label="Níveis de densidade numérica",
+    ):
         if levels:
             X, Y, Z, lvls = self.get_levels(dados_x, dados_y)
             # print(lvls)
         else:
             X, Y, Z, _ = self.get_densities(dados_x, dados_y)
             lvls = [0.24204035, 0.46083535, 1.138656, 1.85108968]  # bpt dados reais
-        plt.contour(X, Y, Z, colors="black", levels=lvls)
+        plt.contour(X, Y, Z, colors=cor, linestyles=linestyle, levels=lvls)
         # sns.kdeplot(x=dados_x, y=dados_y, cmap=cor, fill=False, levels=(0.1, 0.2, 0.4, 0.6))
         plt.plot(
             [],
             [],
-            "-",
-            color="black",
+            linestyle,
+            color=cor,
             linewidth=1,
-            label="Níveis de densidade numérica",
+            label=label,
         )
 
     def bpt_config(self, title="Diagrama BPT", sfx=""):
