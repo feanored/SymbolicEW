@@ -218,8 +218,197 @@ def plot_ocupacao_bpt(df_ocupacao, titulo="Ocupação das regiões do diagrama B
     ax.set_xlabel("Ocupação (%)", fontsize="large")
     ax.set_title(titulo, fontsize="x-large", pad=40)
     ax.invert_yaxis()
-    ax.legend(loc="lower center", bbox_to_anchor=(0.5, 1.02), ncol=3, fontsize="medium")
+    ax.legend(loc="lower center", bbox_to_anchor=(0.5, 0.9), ncol=3, fontsize="medium")
     return ax
+
+
+# --------------------------------------------------------------------------------------------------
+# Testes quantitativos de qualidade de ajuste bidimensional (diagrama BPT)
+# Comparam duas nuvens de pontos 2D (ex.: [NII]/Hα x [OIII]/Hβ observado vs. amostrado)
+
+
+def _subsample_xy(x1, y1, x2, y2, n_max, random_state=RANDOM_SEED):
+    """Sub-amostra (sem reposição) cada par (x,y) para no máximo n_max pontos."""
+    rng = np.random.default_rng(random_state)
+
+    def _sub(x, y):
+        x, y = np.asarray(x), np.asarray(y)
+        if len(x) <= n_max:
+            return x, y
+        idx = rng.choice(len(x), size=n_max, replace=False)
+        return x[idx], y[idx]
+
+    x1, y1 = _sub(x1, y1)
+    x2, y2 = _sub(x2, y2)
+    return x1, y1, x2, y2
+
+
+def energy_test(x1, y1, x2, y2, n_max=1000, n_perm=499, random_state=RANDOM_SEED):
+    """
+    Teste de energia (Székely & Rizzo 2004) para igualdade de duas distribuições
+    bidimensionais. H0: as amostras (x1,y1) e (x2,y2) vêm da mesma distribuição.
+
+        E_{n,m} = 2/(nm) Σ|Xi-Yj| - 1/n² Σ|Xi-Xj| - 1/m² Σ|Yi-Yj|
+
+    A estatística nE_{n,m} = (nm/(n+m))·E_{n,m} é sempre ≥0 sob H0 (e sai de 0
+    conforme as distribuições divergem); o p-valor é obtido por teste de
+    permutação (embaralhando os rótulos de grupo). Amostras grandes são
+    sub-amostradas para no máximo `n_max` pontos, pois o custo é O(n²).
+    """
+    from scipy.spatial.distance import pdist, cdist
+
+    x1, y1, x2, y2 = _subsample_xy(x1, y1, x2, y2, n_max=n_max, random_state=random_state)
+    X = np.column_stack([x1, y1])
+    Y = np.column_stack([x2, y2])
+    n, m = len(X), len(Y)
+
+    def _stat(A, B):
+        na, nb = len(A), len(B)
+        d_ab = cdist(A, B).mean()
+        d_aa = pdist(A).mean() if na > 1 else 0.0
+        d_bb = pdist(B).mean() if nb > 1 else 0.0
+        return (na * nb / (na + nb)) * (2 * d_ab - d_aa - d_bb)
+
+    e_obs = _stat(X, Y)
+
+    rng = np.random.default_rng(random_state)
+    Z = np.vstack([X, Y])
+    e_perm = np.empty(n_perm)
+    for i in range(n_perm):
+        perm = rng.permutation(n + m)
+        e_perm[i] = _stat(Z[perm[:n]], Z[perm[n:]])
+
+    p_value = float((np.sum(e_perm >= e_obs) + 1) / (n_perm + 1))
+    return dict(energy=float(e_obs), p_value=p_value, n=n, m=m, n_perm=n_perm)
+
+
+def wasserstein_test(x1, y1, x2, y2, n_max=2000, n_perm=0, random_state=RANDOM_SEED):
+    """
+    Distância de Wasserstein (transporte ótimo, custo euclidiano) entre as
+    distribuições bidimensionais empíricas (x1,y1) e (x2,y2), via
+    scipy.stats.wasserstein_distance_nd. Quanto menor, mais próximas as
+    distribuições (0 = idênticas). Amostras grandes são sub-amostradas para
+    no máximo `n_max` pontos por eficiência.
+
+    Se n_perm > 0, também calcula um p-valor por permutação (custoso: resolve
+    n_perm problemas de transporte ótimo adicionais).
+    """
+    from scipy.stats import wasserstein_distance_nd
+
+    x1, y1, x2, y2 = _subsample_xy(x1, y1, x2, y2, n_max=n_max, random_state=random_state)
+    X = np.column_stack([x1, y1])
+    Y = np.column_stack([x2, y2])
+    w_obs = float(wasserstein_distance_nd(X, Y))
+
+    resultado = dict(wasserstein=w_obs, n=len(X), m=len(Y))
+    if n_perm > 0:
+        rng = np.random.default_rng(random_state)
+        Z = np.vstack([X, Y])
+        n = len(X)
+        w_perm = np.empty(n_perm)
+        for i in range(n_perm):
+            perm = rng.permutation(len(Z))
+            w_perm[i] = wasserstein_distance_nd(Z[perm[:n]], Z[perm[n:]])
+        resultado["p_value"] = float((np.sum(w_perm >= w_obs) + 1) / (n_perm + 1))
+    return resultado
+
+
+def bhattacharyya_distance_2d(x1, y1, x2, y2, bins=80, xlim=None, ylim=None):
+    """
+    Coeficiente e distância de Bhattacharyya entre as densidades bidimensionais
+    de (x1,y1) e (x2,y2), estimadas por KDE gaussiana num grid comum.
+
+        BC  = Σ sqrt(p_i q_i) ΔxΔy   (coeficiente de sobreposição, 1 = idênticas)
+        D_B = -ln(BC)                (distância, 0 = idênticas)
+    """
+    x1, y1, x2, y2 = (np.asarray(a, dtype=float) for a in (x1, y1, x2, y2))
+    if xlim is None:
+        xlim = (min(x1.min(), x2.min()), max(x1.max(), x2.max()))
+    if ylim is None:
+        ylim = (min(y1.min(), y2.min()), max(y1.max(), y2.max()))
+
+    xgrid = np.linspace(*xlim, bins)
+    ygrid = np.linspace(*ylim, bins)
+    Xg, Yg = np.meshgrid(xgrid, ygrid)
+    positions = np.vstack([Xg.ravel(), Yg.ravel()])
+
+    kde1 = stats.gaussian_kde(np.vstack([x1, y1]))
+    kde2 = stats.gaussian_kde(np.vstack([x2, y2]))
+    p = kde1(positions).reshape(Xg.shape)
+    q = kde2(positions).reshape(Xg.shape)
+
+    dx = xgrid[1] - xgrid[0]
+    dy = ygrid[1] - ygrid[0]
+    p = p / (p.sum() * dx * dy)
+    q = q / (q.sum() * dx * dy)
+
+    bc = float(np.clip(np.sum(np.sqrt(p * q)) * dx * dy, 0.0, 1.0))
+    db = -np.log(bc) if bc > 0 else np.inf
+    return dict(bc=bc, distance=db, grid=(Xg, Yg, p, q))
+
+
+def kl_divergence_2d(x1, y1, x2, y2, bins=50, xlim=None, ylim=None, eps=1e-9):
+    """
+    Divergência KL D(P||Q) entre histogramas bidimensionais conjuntos, onde
+    P=(x1,y1) é a referência (ex.: observado) e Q=(x2,y2) o comparado (ex.:
+    amostrado). Não-simétrica; 0 = distribuições idênticas nos bins usados.
+    """
+    x1, y1, x2, y2 = (np.asarray(a, dtype=float) for a in (x1, y1, x2, y2))
+    if xlim is None:
+        xlim = (min(x1.min(), x2.min()), max(x1.max(), x2.max()))
+    if ylim is None:
+        ylim = (min(y1.min(), y2.min()), max(y1.max(), y2.max()))
+    xedges = np.linspace(*xlim, bins + 1)
+    yedges = np.linspace(*ylim, bins + 1)
+
+    p_counts, _, _ = np.histogram2d(x1, y1, bins=[xedges, yedges])
+    q_counts, _, _ = np.histogram2d(x2, y2, bins=[xedges, yedges])
+    p = p_counts / p_counts.sum() + eps
+    q = q_counts / q_counts.sum() + eps
+    return float(np.sum(p * np.log(p / q)))
+
+
+def ks_test_2d(x1, y1, x2, y2, n_max=500, n_perm=199, random_state=RANDOM_SEED):
+    """
+    Teste de Kolmogorov-Smirnov bidimensional (Peacock 1983 / Fasano &
+    Franceschini 1987). Para cada ponto das duas amostras combinadas, compara
+    a fração de pontos de cada amostra em cada um dos 4 quadrantes definidos
+    por esse ponto; a estatística D é o maior desvio absoluto observado entre
+    as duas amostras, em qualquer quadrante e qualquer ponto-referência.
+    H0: as duas amostras vêm da mesma distribuição bidimensional. O p-valor é
+    obtido por permutação. Custo O(n²) por avaliação — amostras grandes são
+    sub-amostradas para no máximo `n_max` pontos por grupo.
+    """
+
+    def _quad_frac(px, py, x, y):
+        n = len(x)
+        fracs = np.empty((len(px), 4))
+        for q, (sx, sy) in enumerate([(1, 1), (1, -1), (-1, 1), (-1, -1)]):
+            mask = (sx * (x[None, :] - px[:, None]) > 0) & (sy * (y[None, :] - py[:, None]) > 0)
+            fracs[:, q] = mask.sum(axis=1) / n
+        return fracs
+
+    def _stat(xa, ya, xb, yb):
+        px = np.concatenate([xa, xb])
+        py = np.concatenate([ya, yb])
+        fa = _quad_frac(px, py, xa, ya)
+        fb = _quad_frac(px, py, xb, yb)
+        return float(np.max(np.abs(fa - fb)))
+
+    x1, y1, x2, y2 = _subsample_xy(x1, y1, x2, y2, n_max=n_max, random_state=random_state)
+    d_obs = _stat(x1, y1, x2, y2)
+
+    n, m = len(x1), len(x2)
+    X = np.concatenate([x1, x2])
+    Y = np.concatenate([y1, y2])
+    rng = np.random.default_rng(random_state)
+    d_perm = np.empty(n_perm)
+    for i in range(n_perm):
+        perm = rng.permutation(n + m)
+        d_perm[i] = _stat(X[perm[:n]], Y[perm[:n]], X[perm[n:]], Y[perm[n:]])
+
+    p_value = float((np.sum(d_perm >= d_obs) + 1) / (n_perm + 1))
+    return dict(D=d_obs, p_value=p_value, n=n, m=m, n_perm=n_perm)
 
 
 class PlotsMetricas(object):
@@ -2112,6 +2301,59 @@ class PlotsMetricas(object):
         plt.grid(True, alpha=0.2)
         plt.legend(loc="lower left", fontsize="small")
         plt.tight_layout()
+
+    def plot_kde_diff_bpt(
+        self,
+        x1, y1, x2, y2,
+        label1="Observado", label2="Amostrado",
+        bins=100, xlim=(-2, 1), ylim=(-1.5, 1.4),
+        titulo="Diferença de densidades KDE no BPT",
+        ks_kwargs=None,
+    ):
+        """
+        Mapa de diferença ponto-a-ponto entre as KDEs 2D normalizadas de
+        (x1,y1) [label1] e (x2,y2) [label2] no espaço do diagrama BPT, com
+        contornos de cada densidade sobrepostos, e as métricas de ajuste
+        D_KL(P||Q) e KS-2D (Peacock) anotadas no título.
+        """
+        ks_kwargs = ks_kwargs or {}
+        x1, y1, x2, y2 = (np.asarray(a, dtype=float) for a in (x1, y1, x2, y2))
+
+        xgrid = np.linspace(*xlim, bins)
+        ygrid = np.linspace(*ylim, bins)
+        Xg, Yg = np.meshgrid(xgrid, ygrid)
+        positions = np.vstack([Xg.ravel(), Yg.ravel()])
+
+        kde1 = stats.gaussian_kde(np.vstack([x1, y1]), bw_method=0.3)
+        kde2 = stats.gaussian_kde(np.vstack([x2, y2]), bw_method=0.3)
+        Z1 = kde1(positions).reshape(Xg.shape)
+        Z2 = kde2(positions).reshape(Xg.shape)
+
+        dx = xgrid[1] - xgrid[0]
+        dy = ygrid[1] - ygrid[0]
+        Z1 = Z1 / (Z1.sum() * dx * dy)
+        Z2 = Z2 / (Z2.sum() * dx * dy)
+        diff = Z1 - Z2
+
+        kl = kl_divergence_2d(x1, y1, x2, y2, bins=bins, xlim=xlim, ylim=ylim)
+        ks = ks_test_2d(x1, y1, x2, y2, **ks_kwargs)
+
+        fig, ax = plt.subplots(figsize=(8.4, 7))
+        vmax = np.abs(diff).max()
+        im = ax.pcolormesh(Xg, Yg, diff, cmap="coolwarm", vmin=-vmax, vmax=vmax, shading="auto")
+        cbar = fig.colorbar(im, ax=ax)
+        cbar.set_label(f"densidade({label1}) − densidade({label2})", rotation=90, labelpad=10)
+        ax.contour(Xg, Yg, Z1, colors="black", linewidths=0.8, levels=5)
+        ax.contour(Xg, Yg, Z2, colors="white", linewidths=0.8, linestyles="--", levels=5)
+
+        plt.sca(ax)
+        self.bpt_config(
+            f"{titulo}\n"
+            r"$D_{KL}$(%s$\|$%s) = %.4f, KS-2D $D$ = %.4f (p = %.3f)"
+            % (label1, label2, kl, ks["D"], ks["p_value"]),
+            "",
+        )
+        return dict(kl=kl, ks=ks, diff=diff, grid=(Xg, Yg, Z1, Z2))
 
     def bpt_pontos_reg(
         self,

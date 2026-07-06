@@ -1,0 +1,184 @@
+\documentclass[11pt,a4paper]{article}
+
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage[brazil]{babel}
+\usepackage{amsmath,amssymb}
+\usepackage{booktabs}
+\usepackage{geometry}
+\usepackage{hyperref}
+\usepackage{xcolor}
+
+\geometry{margin=2.5cm}
+\hypersetup{colorlinks=true, linkcolor=blue, citecolor=blue, urlcolor=blue}
+
+\title{Hipóteses nulas dos testes estatísticos bidimensionais de energia, Wasserstein e Bhattacharyya}
+\author{}
+\date{}
+
+\begin{document}
+
+\maketitle
+
+\section{Contexto}
+
+Nas comparações realizadas entre a amostra observada (\texttt{test}) e a
+amostra sintética gerada pelo modelo (\texttt{df\_amostras}) no espaço
+bidimensional do diagrama BPT (\([\mathrm{N\textsc{ii}}]/\mathrm{H}\alpha\)
+vs.\ \([\mathrm{O\textsc{iii}}]/\mathrm{H}\beta\)), utilizam-se três
+abordagens para quantificar a similaridade entre as duas distribuições:
+o teste de energia de Székely e Rizzo, a distância de Wasserstein e o
+coeficiente de Bhattacharyya. Este documento descreve, de forma didática,
+a hipótese nula (ou a ausência dela) em cada caso.
+
+\section{Teste de energia (Székely \& Rizzo)}
+
+\textbf{Hipótese nula.} As duas amostras vêm da mesma
+distribuição de probabilidade, isto é:
+\[
+H_0: F_{\text{test}} = F_{\text{amostras}},
+\]
+onde $F$ denota a função de distribuição conjunta no plano BPT.
+
+\textbf{Intuição.} A estatística de energia mede uma espécie de
+``distância elétrica'' entre duas nuvens de pontos, comparando as
+distâncias médias \emph{dentro} de cada grupo com as distâncias médias
+\emph{entre} os grupos \cite{szekely2004,szekely2013}. Quando as duas
+distribuições coincidem, os pontos de um grupo estão, em média, tão
+próximos dos pontos do outro grupo quanto dos seus próprios, e a
+estatística de energia tende a zero.
+
+\textbf{Inferência.} O p-valor é obtido por permutação: os rótulos de
+grupo (\texttt{test} / \texttt{amostras}) são embaralhados repetidamente,
+a estatística de energia é recalculada a cada permutação, e a energia
+observada é comparada à distribuição empírica resultante. Um p-valor
+baixo leva à rejeição de $H_0$, indicando que as distribuições diferem
+de forma estatisticamente significativa; um p-valor alto é consistente
+com a hipótese de que o modelo reproduz bem a distribuição observada.
+
+\section{Distância de Wasserstein}
+
+Formalmente, a distância de Wasserstein não é um teste de hipótese, mas
+uma métrica de transporte ótimo entre duas distribuições
+\cite{villani2009,rubner2000}. No entanto, ao ser combinada com um
+esquema de permutação, ela passa a admitir uma hipótese nula análoga à
+do teste de energia.
+
+\textbf{Hipótese nula.} Assumindo o procedimento de permutação,
+\[
+H_0: F_{\text{test}} = F_{\text{amostras}},
+\]
+de modo que qualquer diferença observada na distância de Wasserstein
+seria explicável apenas por flutuação amostral.
+
+\textbf{Intuição.} A distância de Wasserstein corresponde ao custo
+mínimo de trabalho (massa de probabilidade multiplicada pela distância
+percorrida) necessário para transformar uma distribuição na outra
+\cite{kantorovich1942,villani2009}. Diferentemente do teste de energia,
+ela é sensível não apenas à existência de diferenças, mas também à
+magnitude e à direção geométrica do deslocamento de massa entre as duas
+nuvens de pontos.
+
+\textbf{Inferência.} Um valor de $0$ indica distribuições idênticas. O
+p-valor de permutação é calculado com a mesma lógica do teste de
+energia: embaralham-se os rótulos de grupo, recalcula-se a distância de
+Wasserstein em cada permutação, e compara-se com o valor observado.
+
+\section{Coeficiente e distância de Bhattacharyya}
+
+\textbf{Ausência de hipótese nula formal.} Ao contrário dos dois testes
+anteriores, o coeficiente de Bhattacharyya não constitui um teste de
+hipótese estatística com p-valor associado \cite{bhattacharyya1943,kailath1967}.
+Trata-se de uma medida descritiva de \emph{sobreposição} entre duas
+densidades de probabilidade estimadas via KDE (\textit{kernel density
+estimation}) bidimensional, sem uma distribuição nula ou procedimento de
+permutação subjacente.
+
+\textbf{Definição.} Dadas duas densidades estimadas $p(x,y)$ e $q(x,y)$
+no plano BPT, o coeficiente de Bhattacharyya é definido como
+\[
+BC = \int\!\!\int \sqrt{p(x,y)\, q(x,y)}\; dx\, dy,
+\]
+e a distância correspondente é
+\[
+D_B = -\ln(BC).
+\]
+
+\textbf{Interpretação.}
+\begin{itemize}
+  \item $BC = 1$ ($D_B = 0$): sobreposição total entre as densidades.
+  \item $BC = 0$ ($D_B \to \infty$): nenhuma sobreposição entre as densidades.
+\end{itemize}
+
+Assim, o coeficiente de Bhattacharyya responde à pergunta ``o quanto as
+duas densidades se sobrepõem?'', enquanto os testes de energia e de
+Wasserstein respondem, respectivamente, a ``as duas amostras podem ser
+consideradas estatisticamente indistinguíveis?'' e ``qual o custo de
+transporte entre as duas distribuições, e esse custo é maior do que o
+esperado ao acaso?''.
+
+\section{Resumo comparativo}
+
+\begin{table}[h!]
+\centering
+\begin{tabular}{@{}p{2.7cm}p{5.5cm}p{3cm}p{2.2cm}@{}}
+\toprule
+\textbf{Método} & \textbf{Pergunta respondida} & \textbf{Tem p-valor?} & \textbf{Referência} \\
+\midrule
+Teste de energia & As nuvens de pontos são estatisticamente indistinguíveis? & Sim (permutação) & \cite{szekely2004,szekely2013} \\
+Wasserstein & Qual o custo de deslocamento de massa entre as distribuições, e é maior que o esperado ao acaso? & Sim (permutação) & \cite{villani2009,kantorovich1942} \\
+Bhattacharyya & Quanto as densidades (KDE) se sobrepõem? & Não (medida descritiva) & \cite{bhattacharyya1943} \\
+\bottomrule
+\end{tabular}
+\caption{Comparação entre os três métodos de comparação de distribuições
+bidimensionais no diagrama BPT.}
+\end{table}
+
+\newpage
+\begin{thebibliography}{9}
+
+\bibitem{szekely2004}
+Székely, G.\ J., \& Rizzo, M.\ L.\ (2004).
+\emph{Testing for equal distributions in high dimension.}
+InterStat, 5(16.10), 1--6.
+
+\bibitem{szekely2013}
+Székely, G.\ J., \& Rizzo, M.\ L.\ (2013).
+\emph{Energy statistics: A class of statistics based on distances.}
+Journal of Statistical Planning and Inference, 143(8), 1249--1272.
+\url{https://doi.org/10.1016/j.jspi.2013.03.018}
+
+\bibitem{villani2009}
+Villani, C.\ (2009).
+\emph{Optimal Transport: Old and New.}
+Grundlehren der mathematischen Wissenschaften, vol.\ 338.
+Springer-Verlag, Berlin Heidelberg.
+\url{https://doi.org/10.1007/978-3-540-71050-9}
+
+\bibitem{kantorovich1942}
+Kantorovich, L.\ V.\ (1942).
+\emph{On the translocation of masses.}
+Doklady Akademii Nauk SSSR, 37(7--8), 227--229.
+
+\bibitem{rubner2000}
+Rubner, Y., Tomasi, C., \& Guibas, L.\ J.\ (2000).
+\emph{The Earth Mover's Distance as a metric for image retrieval.}
+International Journal of Computer Vision, 40(2), 99--121.
+\url{https://doi.org/10.1023/A:1026543900054}
+
+\bibitem{bhattacharyya1943}
+Bhattacharyya, A.\ (1943).
+\emph{On a measure of divergence between two statistical populations
+defined by their probability distributions.}
+Bulletin of the Calcutta Mathematical Society, 35, 99--109.
+
+\bibitem{kailath1967}
+Kailath, T.\ (1967).
+\emph{The divergence and Bhattacharyya distance measures in signal
+selection.}
+IEEE Transactions on Communication Technology, 15(1), 52--60.
+\url{https://doi.org/10.1109/TCOM.1967.1089532}
+
+\end{thebibliography}
+
+\end{document}
