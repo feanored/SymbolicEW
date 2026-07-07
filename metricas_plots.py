@@ -941,7 +941,7 @@ class PlotsMetricas(object):
             )
             alpha = 0.4
             if densities:
-                self.curvas_densidade(
+                self.curvas_densidade_norm(
                     background_x,
                     background_y,
                     cor="dimgray",
@@ -985,7 +985,7 @@ class PlotsMetricas(object):
             cbar = plt.colorbar(scatter)
             cbar.set_label(color, rotation=90, labelpad=2)
         if densities:
-            self.curvas_densidade(dados[T.nii_ha.value], dados[T.oiii_hb.value])
+            self.curvas_densidade_norm(dados[T.nii_ha.value], dados[T.oiii_hb.value])
         self.bpt_config("Diagrama BPT: %s" % title, "EW ")
         if show:
             plt.show()
@@ -1257,6 +1257,27 @@ class PlotsMetricas(object):
         densities = kde([x, y])
         lvls = np.quantile(densities, [0.1, 0.2, 0.4, 0.6])
         return X, Y, Z, lvls
+
+    def get_densities_norm(self, x, y, bins=100, xlim=(-2, 1), ylim=(-1.5, 1.4)):
+        # Igual ao get_densities, mas numa grade FIXA (xlim/ylim) e com Z
+        # renormalizado para integrar a 1 dentro dessa janela. Necessário
+        # sempre que a densidade for comparada/subtraída com a de outro
+        # conjunto (curvas_densidade_norm e plot_kde_diff_bpt).
+        x, y = np.asarray(x, dtype=float), np.asarray(y, dtype=float)
+        xgrid = np.linspace(*xlim, bins)
+        ygrid = np.linspace(*ylim, bins)
+        X, Y = np.meshgrid(xgrid, ygrid)
+        positions = np.vstack([X.ravel(), Y.ravel()])
+
+        kde = stats.gaussian_kde(np.vstack([x, y]), bw_method=0.3)
+        Z = kde(positions).reshape(X.shape)
+
+        dx = xgrid[1] - xgrid[0]
+        dy = ygrid[1] - ygrid[0]
+        norm_const = Z.sum() * dx * dy
+        Z = Z / norm_const
+
+        return X, Y, Z, kde, norm_const
 
     # Processar dados das métricas dos testes para k=10 repetições ou len(symbols)=32 funções
     def plot_metricas(self, dados_r, col, hyper, metrica, cor):
@@ -2299,6 +2320,39 @@ class PlotsMetricas(object):
             label=label,
         )
 
+    def _desenha_contorno_niveis(
+        self, X, Y, Z, densities_pts, ax=None, cor="black", linestyle="-",
+        label="Níveis de densidade",
+    ):
+        # Estilo padrão dos contornos do BPT (usado por show_bpt via
+        # curvas_densidade_norm e por plot_kde_diff_bpt): níveis nos quantis
+        # 0.1/0.2/0.4/0.6 da densidade nos próprios pontos, e uma linha
+        # "fantasma" (sem dados) só para aparecer na legenda.
+        ax = ax or plt.gca()
+        lvls = np.quantile(densities_pts, [0.1, 0.2, 0.4, 0.6])
+        ax.contour(X, Y, Z, colors=cor, linestyles=linestyle, levels=lvls)
+        ax.plot(
+            [],
+            [],
+            linestyle,
+            color=cor,
+            linewidth=1,
+            label=label,
+        )
+
+    def curvas_densidade_norm(
+        self, dados_x, dados_y, bins=100, xlim=(-2, 1), ylim=(-1.5, 1.4),
+        cor="black", linestyle="-", label="Níveis de densidade (normalizada)",
+    ):
+        # Mesma densidade (grade fixa + normalização) usada em plot_kde_diff_bpt,
+        # para que os contornos aqui combinem com o mapa de diferença de lá.
+        X, Y, Z, kde, norm_const = self.get_densities_norm(
+            dados_x, dados_y, bins=bins, xlim=xlim, ylim=ylim
+        )
+        densities = kde(np.vstack([dados_x, dados_y])) / norm_const
+        self._desenha_contorno_niveis(X, Y, Z, densities, cor=cor, linestyle=linestyle, label=label)
+        return X, Y, Z
+
     def bpt_config(self, title="Diagrama BPT", sfx=""):
         self.plot_KeKa()  # Linhas de separação teóricas
         plt.xlabel(r"$log_{10}$(%s[NII] / %sH$\alpha$)" % (sfx, sfx), fontsize="large")
@@ -2327,21 +2381,11 @@ class PlotsMetricas(object):
         ks_kwargs = ks_kwargs or {}
         x1, y1, x2, y2 = (np.asarray(a, dtype=float) for a in (x1, y1, x2, y2))
 
-        xgrid = np.linspace(*xlim, bins)
-        ygrid = np.linspace(*ylim, bins)
-        Xg, Yg = np.meshgrid(xgrid, ygrid)
-        positions = np.vstack([Xg.ravel(), Yg.ravel()])
-
-        kde1 = stats.gaussian_kde(np.vstack([x1, y1]), bw_method=0.3)
-        kde2 = stats.gaussian_kde(np.vstack([x2, y2]), bw_method=0.3)
-        Z1 = kde1(positions).reshape(Xg.shape)
-        Z2 = kde2(positions).reshape(Xg.shape)
-
-        dx = xgrid[1] - xgrid[0]
-        dy = ygrid[1] - ygrid[0]
-        Z1 = Z1 / (Z1.sum() * dx * dy)
-        Z2 = Z2 / (Z2.sum() * dx * dy)
-        diff = Z1 - Z2
+        Xg, Yg, Z1, kde1, norm1 = self.get_densities_norm(x1, y1, bins=bins, xlim=xlim, ylim=ylim)
+        _, _, Z2, kde2, norm2 = self.get_densities_norm(x2, y2, bins=bins, xlim=xlim, ylim=ylim)
+        diff = Z2 - Z1
+        dens1_pts = kde1(np.vstack([x1, y1])) / norm1
+        dens2_pts = kde2(np.vstack([x2, y2])) / norm2
 
         kl = kl_divergence_2d(x1, y1, x2, y2, bins=bins, xlim=xlim, ylim=ylim)
         ks = ks_test_2d(x1, y1, x2, y2, **ks_kwargs)
@@ -2350,15 +2394,24 @@ class PlotsMetricas(object):
         vmax = np.abs(diff).max()
         im = ax.pcolormesh(Xg, Yg, diff, cmap="coolwarm", vmin=-vmax, vmax=vmax, shading="auto")
         cbar = fig.colorbar(im, ax=ax)
-        cbar.set_label(f"densidade({label1}) − densidade({label2})", rotation=90, labelpad=10)
-        ax.contour(Xg, Yg, Z1, colors="black", linewidths=0.8, levels=5)
-        ax.contour(Xg, Yg, Z2, colors="white", linewidths=0.8, linestyles="--", levels=5)
+        cbar.set_label(f"density({label2}) - density({label1})", rotation=90, labelpad=10)
+
+        # Mesmo estilo de contorno do show_bpt: fundo/observado em cinza
+        # tracejado, amostra em preto sólido, ambos com entrada na legenda.
+        self._desenha_contorno_niveis(
+            Xg, Yg, Z1, dens1_pts, ax=ax, cor="white", linestyle="-.",
+            label=f"Níveis de densidade ({label1})",
+        )
+        self._desenha_contorno_niveis(
+            Xg, Yg, Z2, dens2_pts, ax=ax, cor="black", linestyle="-",
+            label=f"Níveis de densidade ({label2})",
+        )
 
         plt.sca(ax)
         self.bpt_config(
             f"{titulo}\n"
-            r"$D_{KL}$(%s$\|$%s) = %.4f, KS-2D $D$ = %.4f (p = %.3f)"
-            % (label1, label2, kl, ks["D"], ks["p_value"]),
+            r"$D_{KL}$ = %.4f, KS-2D D = %.4f (p = %.4f)"
+            % (kl, ks["D"], ks["p_value"]),
             "",
         )
         return dict(kl=kl, ks=ks, diff=diff, grid=(Xg, Yg, Z1, Z2))

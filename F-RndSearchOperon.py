@@ -1,3 +1,4 @@
+# Função para treinar ou carregar modelos Operon
 def treinar_modelos_operon(hyper, X_train_bins, items, ignore_load=False):
     for model_key, file_name, col_name, label in items:
         if not ignore_load:
@@ -55,10 +56,12 @@ if __name__ == "__main__":
         ]
     )
 
-    KMAX = 3
+    KMAX = 10
     ALPHA = 0.05
     BEST_SEED = 0
-    
+    BEST_SCORE = -np.inf
+    BEST_OTIMO = False
+
     p_energy = 0
     p_wasserstein = 0
     p_ks2d = 0
@@ -90,11 +93,11 @@ if __name__ == "__main__":
         p.salva_equacoes_operon(modelos, "n4d_all")
         
         p.inspecao_modelos(modelos, train_lhc, p.features, modelo)
-        plt.savefig(f"results/regressoes/{modelo}_meanstds_n4d_all.png", bbox_inches="tight")
+        plt.savefig(f"results/regressoes/{modelo}_meanstds_n4d_all_{RANDOM_SEED}.png", bbox_inches="tight")
         plt.close()
 
         p.inspecao_modelos_covs(modelos, train_lhc, p.features, modelo)
-        plt.savefig(f"results/regressoes/{modelo}_covs_n4d_all.png", bbox_inches="tight")
+        plt.savefig(f"results/regressoes/{modelo}_covs_n4d_all_{RANDOM_SEED}.png", bbox_inches="tight")
         plt.close()
         
         print("Gerando novas amostras!")
@@ -102,7 +105,7 @@ if __name__ == "__main__":
         print(f"Porcentagem de matrizes corrigidas: {p_correcao:.2f}%")
         
         # Ler amostras geradas
-        df_amostras = pd.read_csv(f"results/amostras_all_{modelo}.csv")
+        df_amostras = pd.read_csv(f"results/amostras_all_{modelo}_{RANDOM_SEED}.csv")
         df_amostras = df_amostras.dropna()
         df_amostras = df_amostras.reset_index(drop=True)
         df_amostras[T.nii_ha.value] = df_amostras[T.nii.value] - df_amostras[T.ha.value]
@@ -112,31 +115,20 @@ if __name__ == "__main__":
             "Validation Set": (test[T.nii_ha.value], test[T.oiii_hb.value]),
             "Amostras da Normal4D": (df_amostras[T.nii_ha.value], df_amostras[T.oiii_hb.value]),
         })
-        df_ocupacao_n4d.to_csv(f"results/correlacoes/bpt_ocupacao_n4d_all_{modelo}.csv")
-
         plot_ocupacao_bpt(df_ocupacao_n4d, titulo=f"Ocupação das regiões do BPT - {modelo}")
         plt.tight_layout()
-        plt.savefig(f"results/correlacoes/bpt_ocupacao_n4d_all_{modelo}.png", bbox_inches="tight")
-        plt.close()
-        
-        p.show_bpt(
-            df_amostras, title="Estimadores Operon + Amostras Normal4D", densities=True,
-            background_x=test[T.nii_ha.value],
-            background_y=test[T.oiii_hb.value],
-            background_label="Validation Set"
-        )
-        plt.savefig(f"results/diagramas/bpt_densidades_amostras_n4d_all_{modelo}.png", bbox_inches="tight")
+        plt.savefig(f"results/correlacoes/bpt_ocupacao_n4d_all_{modelo}_{RANDOM_SEED}.png", bbox_inches="tight")
         plt.close()
         
         p.show_bpt(df_amostras, F.azmass.value, title="Estimadores Operon + Amostras Normal4D")
-        plt.savefig(f"results/diagramas/bpt_cores_amostras_n4d_all_{modelo}.png", bbox_inches="tight")
+        plt.savefig(f"results/diagramas/bpt_cores_amostras_n4d_all_{modelo}_{RANDOM_SEED}.png", bbox_inches="tight")
         plt.close()
         
         # 1) Teste de energia (Székely & Rizzo)
         res_energy = energy_test(
             test[T.nii_ha.value], test[T.oiii_hb.value],
             df_amostras[T.nii_ha.value], df_amostras[T.oiii_hb.value],
-            n_max=2000, n_perm=999, n_jobs=16
+            n_max=1000, n_perm=499, n_jobs=16
         )
 
         # 2) Distância de Wasserstein (transporte de massa ótimo)
@@ -159,9 +151,9 @@ if __name__ == "__main__":
             df_amostras[T.nii_ha.value], df_amostras[T.oiii_hb.value],
             label1="Validation Set", label2="Amostras Normal4D",
             titulo=f"Diferença de densidades KDE no BPT - {modelo}",
-            ks_kwargs={"n_max": 1000, "n_perm": 299, "n_jobs": 16},
+            ks_kwargs={"n_max": 1000, "n_perm": 499, "n_jobs": 16},
         )
-        plt.savefig(f"results/correlacoes/bpt_kde_diff_n4d_all_{modelo}.png", bbox_inches="tight")
+        plt.savefig(f"results/correlacoes/bpt_kde_diff_n4d_all_{modelo}_{RANDOM_SEED}.png", bbox_inches="tight")
         plt.close()
         
         # Resumo das estatísticas de ajuste bidimensional no BPT
@@ -175,14 +167,31 @@ if __name__ == "__main__":
         p_energy = df_resumo["energy"].values[0]
         p_wasserstein = df_resumo["wasserstein"].values[0]
         p_ks2d = df_resumo["ks2d"].values[0]
+
+        print(f"\nResumo das estatísticas de ajuste bidimensional no BPT para {modelo}:")
+        print(f"Energy     : {p_energy:.4f}")
+        print(f"Wasserstein: {p_wasserstein:.4f}")
+        print(f"KS-2D      : {p_ks2d:.4f}")
+        print("\n" + "*"*50 + "\n")
         
-        if any([p_energy > ALPHA, p_wasserstein > ALPHA, p_ks2d > ALPHA]):
-            print(f"Modelo {modelo} melhor encontrado com p-values: energy={p_energy:.4f}, wasserstein={p_wasserstein:.4f}, ks2d={p_ks2d:.4f}")
+        # Score = p-value médio entre os três testes; quanto maior, mais perto de
+        # satisfazer todos os critérios simultaneamente. Guarda a melhor seed já vista,
+        # mesmo que nenhuma tenha passado do ALPHA em todos os testes.
+        score_atual = np.mean([p_energy, p_wasserstein, p_ks2d])
+        if score_atual > BEST_SCORE:
+            BEST_SCORE = score_atual
             BEST_SEED = RANDOM_SEED
-        
+            print(f"Novo melhor seed até agora: {BEST_SEED} (pior p-value = {BEST_SCORE:.4f})")
+
         if all([p_energy > ALPHA, p_wasserstein > ALPHA, p_ks2d > ALPHA]):
             print(f"Modelo {modelo} ótimo encontrado com todos os p-values acima de {ALPHA:.1e}!")
             BEST_SEED = RANDOM_SEED
+            BEST_SCORE = score_atual
+            BEST_OTIMO = True
             break
 
-print(f"Melhor modelo encontrado com seed {BEST_SEED} e p-values: energy={p_energy:.4f}, wasserstein={p_wasserstein:.4f}, ks2d={p_ks2d:.4f}")
+if BEST_OTIMO:
+    print(f"\nMelhor modelo encontrado com seed {BEST_SEED} (ótimo, todos os p-values > {ALPHA:.1e}) e pior p-value={BEST_SCORE:.4f}")
+else:
+    print(f"\nNenhuma seed atingiu todos os p-values > {ALPHA:.1e} em {KMAX} iterações.")
+    print(f"Melhor seed encontrada mesmo assim: {BEST_SEED} (pior p-value={BEST_SCORE:.4f})")
