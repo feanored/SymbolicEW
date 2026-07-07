@@ -243,7 +243,7 @@ def _subsample_xy(x1, y1, x2, y2, n_max, random_state=RANDOM_SEED):
     return x1, y1, x2, y2
 
 
-def energy_test(x1, y1, x2, y2, n_max=1000, n_perm=499, random_state=RANDOM_SEED):
+def energy_test(x1, y1, x2, y2, n_max=1000, n_perm=499, random_state=RANDOM_SEED, n_jobs=12):
     """
     Teste de energia (Székely & Rizzo 2004) para igualdade de duas distribuições
     bidimensionais. H0: as amostras (x1,y1) e (x2,y2) vêm da mesma distribuição.
@@ -253,9 +253,12 @@ def energy_test(x1, y1, x2, y2, n_max=1000, n_perm=499, random_state=RANDOM_SEED
     A estatística nE_{n,m} = (nm/(n+m))·E_{n,m} é sempre ≥0 sob H0 (e sai de 0
     conforme as distribuições divergem); o p-valor é obtido por teste de
     permutação (embaralhando os rótulos de grupo). Amostras grandes são
-    sub-amostradas para no máximo `n_max` pontos, pois o custo é O(n²).
+    sub-amostradas para no máximo `n_max` pontos, pois o custo é O(n²). As
+    permutações são distribuídas entre `n_jobs` processos (-1 = todos os
+    núcleos disponíveis).
     """
     from scipy.spatial.distance import pdist, cdist
+    from joblib import Parallel, delayed
 
     x1, y1, x2, y2 = _subsample_xy(x1, y1, x2, y2, n_max=n_max, random_state=random_state)
     X = np.column_stack([x1, y1])
@@ -273,16 +276,16 @@ def energy_test(x1, y1, x2, y2, n_max=1000, n_perm=499, random_state=RANDOM_SEED
 
     rng = np.random.default_rng(random_state)
     Z = np.vstack([X, Y])
-    e_perm = np.empty(n_perm)
-    for i in range(n_perm):
-        perm = rng.permutation(n + m)
-        e_perm[i] = _stat(Z[perm[:n]], Z[perm[n:]])
+    perms = [rng.permutation(n + m) for _ in range(n_perm)]
+    e_perm = np.array(Parallel(n_jobs=n_jobs)(
+        delayed(_stat)(Z[perm[:n]], Z[perm[n:]]) for perm in perms
+    ))
 
     p_value = float((np.sum(e_perm >= e_obs) + 1) / (n_perm + 1))
     return dict(energy=float(e_obs), p_value=p_value, n=n, m=m, n_perm=n_perm)
 
 
-def wasserstein_test(x1, y1, x2, y2, n_max=2000, n_perm=0, random_state=RANDOM_SEED):
+def wasserstein_test(x1, y1, x2, y2, n_max=2000, n_perm=0, random_state=RANDOM_SEED, n_jobs=12):
     """
     Distância de Wasserstein (transporte ótimo, custo euclidiano) entre as
     distribuições bidimensionais empíricas (x1,y1) e (x2,y2), via
@@ -291,9 +294,11 @@ def wasserstein_test(x1, y1, x2, y2, n_max=2000, n_perm=0, random_state=RANDOM_S
     no máximo `n_max` pontos por eficiência.
 
     Se n_perm > 0, também calcula um p-valor por permutação (custoso: resolve
-    n_perm problemas de transporte ótimo adicionais).
+    n_perm problemas de transporte ótimo adicionais, distribuídos entre
+    `n_jobs` processos; -1 = todos os núcleos disponíveis).
     """
     from scipy.stats import wasserstein_distance_nd
+    from joblib import Parallel, delayed
 
     x1, y1, x2, y2 = _subsample_xy(x1, y1, x2, y2, n_max=n_max, random_state=random_state)
     X = np.column_stack([x1, y1])
@@ -305,10 +310,10 @@ def wasserstein_test(x1, y1, x2, y2, n_max=2000, n_perm=0, random_state=RANDOM_S
         rng = np.random.default_rng(random_state)
         Z = np.vstack([X, Y])
         n = len(X)
-        w_perm = np.empty(n_perm)
-        for i in range(n_perm):
-            perm = rng.permutation(len(Z))
-            w_perm[i] = wasserstein_distance_nd(Z[perm[:n]], Z[perm[n:]])
+        perms = [rng.permutation(len(Z)) for _ in range(n_perm)]
+        w_perm = np.array(Parallel(n_jobs=n_jobs)(
+            delayed(wasserstein_distance_nd)(Z[perm[:n]], Z[perm[n:]]) for perm in perms
+        ))
         resultado["p_value"] = float((np.sum(w_perm >= w_obs) + 1) / (n_perm + 1))
     return resultado
 
@@ -368,7 +373,7 @@ def kl_divergence_2d(x1, y1, x2, y2, bins=50, xlim=None, ylim=None, eps=1e-9):
     return float(np.sum(p * np.log(p / q)))
 
 
-def ks_test_2d(x1, y1, x2, y2, n_max=500, n_perm=199, random_state=RANDOM_SEED):
+def ks_test_2d(x1, y1, x2, y2, n_max=500, n_perm=199, random_state=RANDOM_SEED, n_jobs=12):
     """
     Teste de Kolmogorov-Smirnov bidimensional (Peacock 1983 / Fasano &
     Franceschini 1987). Para cada ponto das duas amostras combinadas, compara
@@ -377,8 +382,11 @@ def ks_test_2d(x1, y1, x2, y2, n_max=500, n_perm=199, random_state=RANDOM_SEED):
     as duas amostras, em qualquer quadrante e qualquer ponto-referência.
     H0: as duas amostras vêm da mesma distribuição bidimensional. O p-valor é
     obtido por permutação. Custo O(n²) por avaliação — amostras grandes são
-    sub-amostradas para no máximo `n_max` pontos por grupo.
+    sub-amostradas para no máximo `n_max` pontos por grupo. As permutações
+    são distribuídas entre `n_jobs` processos (-1 = todos os núcleos
+    disponíveis).
     """
+    from joblib import Parallel, delayed
 
     def _quad_frac(px, py, x, y):
         n = len(x)
@@ -402,10 +410,10 @@ def ks_test_2d(x1, y1, x2, y2, n_max=500, n_perm=199, random_state=RANDOM_SEED):
     X = np.concatenate([x1, x2])
     Y = np.concatenate([y1, y2])
     rng = np.random.default_rng(random_state)
-    d_perm = np.empty(n_perm)
-    for i in range(n_perm):
-        perm = rng.permutation(n + m)
-        d_perm[i] = _stat(X[perm[:n]], Y[perm[:n]], X[perm[n:]], Y[perm[n:]])
+    perms = [rng.permutation(n + m) for _ in range(n_perm)]
+    d_perm = np.array(Parallel(n_jobs=n_jobs)(
+        delayed(_stat)(X[perm[:n]], Y[perm[:n]], X[perm[n:]], Y[perm[n:]]) for perm in perms
+    ))
 
     p_value = float((np.sum(d_perm >= d_obs) + 1) / (n_perm + 1))
     return dict(D=d_obs, p_value=p_value, n=n, m=m, n_perm=n_perm)
