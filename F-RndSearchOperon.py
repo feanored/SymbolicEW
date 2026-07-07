@@ -56,7 +56,35 @@ if __name__ == "__main__":
         ]
     )
 
-    KMAX = 10
+    # Configuração do Operon
+    config_operon = {
+        "random_state": RANDOM_SEED,
+        "population_size": 2000,
+        "generations": 2000,
+        "allowed_symbols": "add,sub,mul,aq,constant,variable,pow,exp,tanh",
+        "max_length": 50,
+        "initialization_max_length": 10,
+        "max_depth": 50,
+        "initialization_max_depth": 10,
+        "optimizer_iterations": 100,
+        "model_selection_criterion": "bayesian_information_criterion",
+        "objectives": ["r2", "length"],
+        "n_threads": 32,
+    }
+    
+    # Treinar operon para todas as células
+    treinar_modelos_operon(config_operon, X_train_bins, items, False)
+    p.salva_equacoes_operon(modelos, "n4d_all")
+    
+    p.inspecao_modelos(modelos, train_lhc, p.features, modelo)
+    plt.savefig(f"results/regressoes/{modelo}_meanstds_n4d_all_{RANDOM_SEED}.png", bbox_inches="tight")
+    plt.close()
+
+    p.inspecao_modelos_covs(modelos, train_lhc, p.features, modelo)
+    plt.savefig(f"results/regressoes/{modelo}_covs_n4d_all_{RANDOM_SEED}.png", bbox_inches="tight")
+    plt.close()
+
+    KMAX = 100
     ALPHA = 0.05
     BEST_SEED = 0
     BEST_SCORE = -np.inf
@@ -69,43 +97,15 @@ if __name__ == "__main__":
     k = 0
     while k < KMAX:
         k += 1
-        RANDOM_SEED = np.random.randint(1, 10000)
+        RANDOM_SEED = np.random.randint(10000, 20000)
         print(f"\n\nIteração {k}/{KMAX} - Seed aleatória: {RANDOM_SEED}")
-        
-        # Configuração do Operon
-        config_operon = {
-            "random_state": RANDOM_SEED,
-            "population_size": 2000,
-            "generations": 2000,
-            "allowed_symbols": "add,sub,mul,aq,constant,variable,pow,exp,tanh",
-            "max_length": 50,
-            "initialization_max_length": 10,
-            "max_depth": 50,
-            "initialization_max_depth": 10,
-            "optimizer_iterations": 100,
-            "model_selection_criterion": "bayesian_information_criterion",
-            "objectives": ["r2", "length"],
-            "n_threads": 32,
-        }
-        
-        # Treinar operon para todas as células
-        treinar_modelos_operon(config_operon, X_train_bins, items, True)
-        p.salva_equacoes_operon(modelos, "n4d_all")
-        
-        p.inspecao_modelos(modelos, train_lhc, p.features, modelo)
-        plt.savefig(f"results/regressoes/{modelo}_meanstds_n4d_all_{RANDOM_SEED}.png", bbox_inches="tight")
-        plt.close()
-
-        p.inspecao_modelos_covs(modelos, train_lhc, p.features, modelo)
-        plt.savefig(f"results/regressoes/{modelo}_covs_n4d_all_{RANDOM_SEED}.png", bbox_inches="tight")
-        plt.close()
         
         print("Gerando novas amostras!")
         p_correcao = p.gerar_amostras(modelos, modelo, test, test_lhc)
         print(f"Porcentagem de matrizes corrigidas: {p_correcao:.2f}%")
         
         # Ler amostras geradas
-        df_amostras = pd.read_csv(f"results/amostras_all_{modelo}_{RANDOM_SEED}.csv")
+        df_amostras = pd.read_csv(f"results/amostras_all_{modelo}.csv")
         df_amostras = df_amostras.dropna()
         df_amostras = df_amostras.reset_index(drop=True)
         df_amostras[T.nii_ha.value] = df_amostras[T.nii.value] - df_amostras[T.ha.value]
@@ -117,7 +117,7 @@ if __name__ == "__main__":
         })
         plot_ocupacao_bpt(df_ocupacao_n4d, titulo=f"Ocupação das regiões do BPT - {modelo}")
         plt.tight_layout()
-        plt.savefig(f"results/correlacoes/bpt_ocupacao_n4d_all_{modelo}_{RANDOM_SEED}.png", bbox_inches="tight")
+        plt.savefig(f"results/correlacoes/bpt_ocupacao_n4d_all_{modelo}.png", bbox_inches="tight")
         plt.close()
         
         p.show_bpt(df_amostras, F.azmass.value, title="Estimadores Operon + Amostras Normal4D")
@@ -172,7 +172,6 @@ if __name__ == "__main__":
         print(f"Energy     : {p_energy:.4f}")
         print(f"Wasserstein: {p_wasserstein:.4f}")
         print(f"KS-2D      : {p_ks2d:.4f}")
-        print("\n" + "*"*50 + "\n")
         
         # Score = p-value médio entre os três testes; quanto maior, mais perto de
         # satisfazer todos os critérios simultaneamente. Guarda a melhor seed já vista,
@@ -181,7 +180,7 @@ if __name__ == "__main__":
         if score_atual > BEST_SCORE:
             BEST_SCORE = score_atual
             BEST_SEED = RANDOM_SEED
-            print(f"Novo melhor seed até agora: {BEST_SEED} (pior p-value = {BEST_SCORE:.4f})")
+            print(f"Novo melhor seed até agora: {BEST_SEED} (p-value médio = {BEST_SCORE:.4f})")
 
         if all([p_energy > ALPHA, p_wasserstein > ALPHA, p_ks2d > ALPHA]):
             print(f"Modelo {modelo} ótimo encontrado com todos os p-values acima de {ALPHA:.1e}!")
@@ -189,6 +188,8 @@ if __name__ == "__main__":
             BEST_SCORE = score_atual
             BEST_OTIMO = True
             break
+        
+        print("\n" + "*"*50 + "\n")
 
 if BEST_OTIMO:
     print(f"\nMelhor modelo encontrado com seed {BEST_SEED} (ótimo, todos os p-values > {ALPHA:.1e}) e pior p-value={BEST_SCORE:.4f}")

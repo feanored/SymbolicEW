@@ -2396,6 +2396,14 @@ class PlotsMetricas(object):
         cbar = fig.colorbar(im, ax=ax)
         cbar.set_label(f"density({label2}) - density({label1})", rotation=90, labelpad=10)
 
+        plt.sca(ax)
+        self.bpt_config(
+            f"{titulo}\n"
+            r"$D_{KL}$ = %.4f, KS-2D D = %.4f (p = %.4f)"
+            % (kl, ks["D"], ks["p_value"]),
+            "",
+        )
+
         # Mesmo estilo de contorno do show_bpt: fundo/observado em cinza
         # tracejado, amostra em preto sólido, ambos com entrada na legenda.
         self._desenha_contorno_niveis(
@@ -2407,13 +2415,8 @@ class PlotsMetricas(object):
             label=f"Níveis de densidade ({label2})",
         )
 
-        plt.sca(ax)
-        self.bpt_config(
-            f"{titulo}\n"
-            r"$D_{KL}$ = %.4f, KS-2D D = %.4f (p = %.4f)"
-            % (kl, ks["D"], ks["p_value"]),
-            "",
-        )
+        ax.legend(loc="lower left", fontsize="small")
+
         return dict(kl=kl, ks=ks, diff=diff, grid=(Xg, Yg, Z1, Z2))
 
     def bpt_pontos_reg(
