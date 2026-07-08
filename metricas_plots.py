@@ -2395,15 +2395,21 @@ class PlotsMetricas(object):
         label1="Observado", label2="Amostrado",
         bins=100, xlim=(-2, 1), ylim=(-1.5, 1.4),
         titulo="Diferença de densidades KDE no BPT",
-        ks_kwargs=None,
+        ks=None,
     ):
         """
         Mapa de diferença ponto-a-ponto entre as KDEs 2D normalizadas de
         (x1,y1) [label1] e (x2,y2) [label2] no espaço do diagrama BPT, com
         contornos de cada densidade sobrepostos, e as métricas de ajuste
         D_KL(P||Q) e KS-2D (Peacock) anotadas no título.
+
+        `ks` é o resultado (dict com "D" e "p_value") de uma chamada externa
+        a `ks_test_2d(x1, y1, x2, y2, ...)`, feita fora desta função para que
+        a escolha de `n_max`/`n_perm`/`random_state` fique explícita e
+        reprodutível no ponto de chamada.
         """
-        ks_kwargs = ks_kwargs or {}
+        if ks is None:
+            raise ValueError("Passe `ks`, o resultado de uma chamada externa a ks_test_2d(...).")
         x1, y1, x2, y2 = (np.asarray(a, dtype=float) for a in (x1, y1, x2, y2))
 
         Xg, Yg, Z1, kde1, norm1 = self.get_densities_norm(x1, y1, bins=bins, xlim=xlim, ylim=ylim)
@@ -2413,7 +2419,6 @@ class PlotsMetricas(object):
         dens2_pts = kde2(np.vstack([x2, y2])) / norm2
 
         kl = kl_divergence_2d(x1, y1, x2, y2, bins=bins, xlim=xlim, ylim=ylim)
-        ks = ks_test_2d(x1, y1, x2, y2, **ks_kwargs)
 
         fig, ax = plt.subplots(figsize=(8.4, 7))
         vmax = np.abs(diff).max()

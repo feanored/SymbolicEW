@@ -67,7 +67,7 @@ if __name__ == "__main__":
         "optimizer_iterations": 1000,
         "model_selection_criterion": "bayesian_information_criterion",
         "objectives": ["r2", "length"],
-        "n_threads": 32,
+        "n_threads": 12,
     }
     
     # Treinar operon para todas as células
@@ -85,7 +85,7 @@ if __name__ == "__main__":
     KMAX = 100
     ALPHA = 0.05
     BEST_SEED = 0
-    BEST_SCORE = -np.inf
+    BEST_SCORE = np.inf
     BEST_OTIMO = False
 
     p_energy = 0
@@ -108,15 +108,6 @@ if __name__ == "__main__":
         df_amostras = df_amostras.reset_index(drop=True)
         df_amostras[T.nii_ha.value] = df_amostras[T.nii.value] - df_amostras[T.ha.value]
         df_amostras[T.oiii_hb.value] = df_amostras[T.oiii.value] - df_amostras[T.hb.value]
-
-        df_ocupacao_n4d = tabela_ocupacao_bpt({
-            "Validation Set": (test[T.nii_ha.value], test[T.oiii_hb.value]),
-            "Amostras da Normal4D": (df_amostras[T.nii_ha.value], df_amostras[T.oiii_hb.value]),
-        })
-        plot_ocupacao_bpt(df_ocupacao_n4d, titulo=f"Ocupação das regiões do BPT - {modelo}")
-        plt.tight_layout()
-        plt.savefig(f"results/correlacoes/bpt_ocupacao_n4d_all_{modelo}.png", bbox_inches="tight")
-        plt.close()
         
         p.show_bpt(df_amostras, F.azmass.value, title="Estimadores Operon + Amostras Normal4D")
         plt.savefig(f"results/diagramas/bpt_cores_amostras_n4d_all_{modelo}_{RANDOM_SEED}.png", bbox_inches="tight")
@@ -126,14 +117,14 @@ if __name__ == "__main__":
         res_energy = energy_test_repeated(
             test[T.nii_ha.value], test[T.oiii_hb.value],
             df_amostras[T.nii_ha.value], df_amostras[T.oiii_hb.value],
-            n_repeats=200, n_max=500, n_perm=199, n_jobs=16
+            n_repeats=200, n_max=500, n_perm=199, n_jobs=12
         )
 
         # 2) Distância de Wasserstein (transporte de massa ótimo)
         res_wasserstein = wasserstein_test(
             test[T.nii_ha.value], test[T.oiii_hb.value],
             df_amostras[T.nii_ha.value], df_amostras[T.oiii_hb.value],
-            n_max=250, n_perm=199, n_jobs=16
+            n_max=250, n_perm=199, n_jobs=12
         )
         
         # 3) Distância de Bhattacharyya entre as densidades 2D no BPT
@@ -144,12 +135,17 @@ if __name__ == "__main__":
         )
         
         # 4) Diferença de densidades KDE 2D + testes KL e KS-2D
+        res_ks2d = ks_test_2d(
+            test[T.nii_ha.value], test[T.oiii_hb.value],
+            df_amostras[T.nii_ha.value], df_amostras[T.oiii_hb.value],
+            n_max=2000, n_perm=999, random_state=RANDOM_SEED, n_jobs=12
+        )
         res_kde_diff = p.plot_kde_diff_bpt(
             test[T.nii_ha.value], test[T.oiii_hb.value],
             df_amostras[T.nii_ha.value], df_amostras[T.oiii_hb.value],
             label1="Validation Set", label2="Amostras Normal4D",
             titulo=f"Diferença de densidades KDE no BPT - {modelo}",
-            ks_kwargs={"n_max": 1000, "n_perm": 499, "n_jobs": 16},
+            ks=res_ks2d,
         )
         plt.savefig(f"results/correlacoes/bpt_kde_diff_n4d_all_{modelo}_{RANDOM_SEED}.png", bbox_inches="tight")
         plt.close()
@@ -159,26 +155,28 @@ if __name__ == "__main__":
             "energy": res_energy["p_value"].mean(),
             "wasserstein": res_wasserstein["p_value"],
             "bhattacharyya": res_bhatt["distance"],
-            "ks2d": res_kde_diff["ks"]["p_value"],
+            "ks2d": res_ks2d["p_value"],
+            "ks2d_D": res_ks2d["D"],
         }], index=[modelo])
-        
+
         p_energy = df_resumo["energy"].values[0]
         p_wasserstein = df_resumo["wasserstein"].values[0]
         p_ks2d = df_resumo["ks2d"].values[0]
+        d_ks2d = df_resumo["ks2d_D"].values[0]
 
         print(f"\nResumo das estatísticas de ajuste bidimensional no BPT para {modelo}:")
         print(f"Energy     : {p_energy:.4f}")
         print(f"Wasserstein: {p_wasserstein:.4f}")
-        print(f"KS-2D      : {p_ks2d:.4f}")
-        
-        # Score = p-value médio entre os três testes; quanto maior, mais perto de
-        # satisfazer todos os critérios simultaneamente. Guarda a melhor seed já vista,
-        # mesmo que nenhuma tenha passado do ALPHA em todos os testes.
-        score_atual = np.mean([p_energy, p_wasserstein, p_ks2d])
-        if score_atual > BEST_SCORE:
+        print(f"KS-2D Dist.: {d_ks2d:.4f} (p = {p_ks2d:.4f})")
+
+        # Score = estatística D do KS-2D; quanto menor, mais próximas as duas
+        # distribuições espacialmente. Guarda a melhor seed já vista, mesmo
+        # que nenhuma tenha passado do ALPHA em todos os testes de p-value.
+        score_atual = d_ks2d
+        if score_atual < BEST_SCORE:
             BEST_SCORE = score_atual
             BEST_SEED = RANDOM_SEED
-            print(f"Novo melhor seed até agora: {BEST_SEED} (p-value médio = {BEST_SCORE:.4f})")
+            print(f"Novo melhor seed até agora: {BEST_SEED} (KS-2D D = {BEST_SCORE:.4f})")
 
         if all([p_energy > ALPHA, p_wasserstein > ALPHA, p_ks2d > ALPHA]):
             print(f"Modelo {modelo} ótimo encontrado com todos os p-values acima de {ALPHA:.1e}!")
@@ -186,11 +184,11 @@ if __name__ == "__main__":
             BEST_SCORE = score_atual
             BEST_OTIMO = True
             break
-        
+
         print("\n" + "*"*50 + "\n")
 
 if BEST_OTIMO:
-    print(f"\nMelhor modelo encontrado com seed {BEST_SEED} (ótimo, todos os p-values > {ALPHA:.1e}) e pior p-value={BEST_SCORE:.4f}")
+    print(f"\nMelhor modelo encontrado com seed {BEST_SEED} (ótimo, todos os p-values > {ALPHA:.1e}) e KS-2D D={BEST_SCORE:.4f}")
 else:
     print(f"\nNenhuma seed atingiu todos os p-values > {ALPHA:.1e} em {KMAX} iterações.")
-    print(f"Melhor seed encontrada mesmo assim: {BEST_SEED} (pior p-value={BEST_SCORE:.4f})")
+    print(f"Melhor seed encontrada mesmo assim (menor KS-2D D): {BEST_SEED} (D={BEST_SCORE:.4f})")
