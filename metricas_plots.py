@@ -285,6 +285,31 @@ def energy_test(x1, y1, x2, y2, n_max=1000, n_perm=499, random_state=RANDOM_SEED
     return dict(energy=float(e_obs), p_value=p_value, n=n, m=m, n_perm=n_perm)
 
 
+def energy_test_repeated(
+    x1, y1, x2, y2, n_repeats=100, n_max=1000, n_perm=499, random_state=RANDOM_SEED, n_jobs=12
+):
+    """
+    Repete `energy_test` `n_repeats` vezes, cada uma com uma sub-amostragem
+    diferente (novo `random_state` derivado de `random_state`), para avaliar
+    a robustez do resultado à escolha aleatória dos `n_max` pontos. Dentro de
+    cada repetição a sub-amostra permanece fixa (como exige o teste de
+    permutação); o que varia entre repetições é qual sub-amostra foi sorteada.
+
+    Retorna um DataFrame com uma linha por repetição (seed, energy, p_value).
+    """
+    rng = np.random.default_rng(random_state)
+    seeds = rng.integers(0, 2**31 - 1, size=n_repeats)
+
+    rows = []
+    for seed in seeds:
+        res = energy_test(
+            x1, y1, x2, y2, n_max=n_max, n_perm=n_perm, random_state=int(seed), n_jobs=n_jobs
+        )
+        rows.append({"seed": int(seed), "energy": res["energy"], "p_value": res["p_value"]})
+
+    return pd.DataFrame(rows)
+
+
 def wasserstein_test(x1, y1, x2, y2, n_max=2000, n_perm=0, random_state=RANDOM_SEED, n_jobs=12):
     """
     Distância de Wasserstein (transporte ótimo, custo euclidiano) entre as
@@ -2342,7 +2367,7 @@ class PlotsMetricas(object):
 
     def curvas_densidade_norm(
         self, dados_x, dados_y, bins=100, xlim=(-2, 1), ylim=(-1.5, 1.4),
-        cor="black", linestyle="-", label="Níveis de densidade (normalizada)",
+        cor="black", linestyle="-", label="Níveis de densidade numérica",
     ):
         # Mesma densidade (grade fixa + normalização) usada em plot_kde_diff_bpt,
         # para que os contornos aqui combinem com o mapa de diferença de lá.

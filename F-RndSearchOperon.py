@@ -62,11 +62,9 @@ if __name__ == "__main__":
         "population_size": 2000,
         "generations": 2000,
         "allowed_symbols": "add,sub,mul,aq,constant,variable,pow,exp,tanh",
-        "max_length": 50,
-        "initialization_max_length": 10,
-        "max_depth": 50,
-        "initialization_max_depth": 10,
-        "optimizer_iterations": 100,
+        "max_length": 25,
+        "max_depth": 100,
+        "optimizer_iterations": 1000,
         "model_selection_criterion": "bayesian_information_criterion",
         "objectives": ["r2", "length"],
         "n_threads": 32,
@@ -123,12 +121,12 @@ if __name__ == "__main__":
         p.show_bpt(df_amostras, F.azmass.value, title="Estimadores Operon + Amostras Normal4D")
         plt.savefig(f"results/diagramas/bpt_cores_amostras_n4d_all_{modelo}_{RANDOM_SEED}.png", bbox_inches="tight")
         plt.close()
-        
-        # 1) Teste de energia (Székely & Rizzo)
-        res_energy = energy_test(
+
+        # 1) Teste de energia repetido: robustez à escolha da sub-amostra de n_max pontos
+        res_energy = energy_test_repeated(
             test[T.nii_ha.value], test[T.oiii_hb.value],
             df_amostras[T.nii_ha.value], df_amostras[T.oiii_hb.value],
-            n_max=1000, n_perm=499, n_jobs=16
+            n_repeats=200, n_max=500, n_perm=199, n_jobs=16
         )
 
         # 2) Distância de Wasserstein (transporte de massa ótimo)
@@ -158,7 +156,7 @@ if __name__ == "__main__":
         
         # Resumo das estatísticas de ajuste bidimensional no BPT
         df_resumo = pd.DataFrame([{
-            "energy": res_energy["p_value"],
+            "energy": res_energy["p_value"].mean(),
             "wasserstein": res_wasserstein["p_value"],
             "bhattacharyya": res_bhatt["distance"],
             "ks2d": res_kde_diff["ks"]["p_value"],
