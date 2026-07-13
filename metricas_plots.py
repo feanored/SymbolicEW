@@ -9,7 +9,10 @@ import seaborn as sns
 import logging
 logging.getLogger('matplotlib.font_manager').setLevel(logging.ERROR)
 import matplotlib
-matplotlib.use('Agg')
+try:
+    get_ipython() # type: ignore - defined by IPython/Jupyter at runtime
+except NameError:
+    matplotlib.use('Agg')  # headless (plain script) execution
 import smplotlib # type: ignore
 import matplotlib.pyplot as plt
 import plotly.graph_objects as go
@@ -2649,7 +2652,7 @@ class PlotsMetricas(object):
             save=save,
         )
 
-    def gerar_amostras(self, modelos, algo, test, test_lhc):
+    def gerar_amostras(self, modelos, algo, test, test_lhc=None):
         X_test = test[self.features].to_numpy(dtype=np.float64, copy=True)
         larguras = self.targets[:4]
         n_samples = len(X_test)
@@ -2660,13 +2663,13 @@ class PlotsMetricas(object):
         means_all = np.column_stack(
             [modelos[f"{nome}_mean"].predict(X_test) for nome in larguras]
         )
-        if algo == "operon":
+        if test_lhc is not None:
             stds_all = np.column_stack(
                 [np.full(n_samples, test_lhc[f"{nome}_std"].mean()) for nome in larguras]
             )
         else:
             stds_all = np.column_stack(
-                [np.maximum(modelos[f"{nome}_std"].predict(X_test), 1e-6) for nome in larguras]
+                [modelos[f"{nome}_std"].predict(X_test) for nome in larguras]
             )
         covs_all = {}
         for l1, l2 in self.cov_pairs:
@@ -2776,6 +2779,58 @@ class PlotsMetricas(object):
         k_neighbors: int = 50,
         seed: int = 42
     ) -> pd.DataFrame:
+        return self._lhs_cells(df, features, targets, n, k_neighbors, seed)
+
+    def lhs_subsample_with_stats_bpt(self,
+        df: pd.DataFrame,
+        features: list,
+        targets: list,
+        n: int,
+        k_neighbors: int = 50,
+        seed: int = 42,
+        col_nii_ha: str = T.nii_ha.value,
+        col_oiii_hb: str = T.oiii_hb.value,
+    ) -> pd.DataFrame:
+        """Igual a lhs_subsample_with_stats, mas particiona o plano LHS por
+        região do BPT (SF/Composite/AGN), sorteando de cada região uma
+        quantidade de células proporcional à ocupação observada em df, em vez
+        de cobrir o espaço de features uniformemente."""
+        classes = ["SF", "Composite", "AGN"]
+        labels = classifica_bpt(df[col_nii_ha].values, df[col_oiii_hb].values)
+
+        contagem = {c: int(np.sum(labels == c)) for c in classes}
+        total = len(df)
+        n_bruto = {c: n * contagem[c] / total for c in classes}
+        n_classe = {c: int(np.floor(n_bruto[c])) for c in classes}
+
+        # Método dos maiores restos, para que sum(n_classe) == n
+        resto = n - sum(n_classe.values())
+        for c in sorted(classes, key=lambda c: n_bruto[c] - n_classe[c], reverse=True)[:resto]:
+            n_classe[c] += 1
+
+        partes = []
+        for i, c in enumerate(classes):
+            if n_classe[c] == 0 or contagem[c] == 0:
+                continue
+            df_classe = df[labels == c]
+            cells = self._lhs_cells(
+                df_classe, features, targets, n_classe[c],
+                k_neighbors=min(k_neighbors, len(df_classe)),
+                seed=seed + i,
+            )
+            cells["bpt_class"] = c
+            partes.append(cells)
+
+        return pd.concat(partes, ignore_index=True)
+
+    def _lhs_cells(self,
+        df: pd.DataFrame,
+        features: list,
+        targets: list,
+        n: int,
+        k_neighbors: int = 50,
+        seed: int = 42
+    ) -> pd.DataFrame:
 
         d = len(features)
         X = df[features].values
@@ -2802,7 +2857,10 @@ class PlotsMetricas(object):
 
             # Vizinhança: k pontos mais próximos (a "célula")
             k = min(k_neighbors, len(available))
-            neighbor_local_idx = np.argpartition(dists, k)[:k]
+            if k >= len(available):
+                neighbor_local_idx = np.arange(len(available))
+            else:
+                neighbor_local_idx = np.argpartition(dists, k)[:k]
             neighbor_global_idx = available[neighbor_local_idx]
 
             Y_cell = Y[neighbor_global_idx]

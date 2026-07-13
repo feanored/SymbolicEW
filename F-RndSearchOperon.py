@@ -30,8 +30,7 @@ if __name__ == "__main__":
     test[T.oiii_hb.value] = test[T.oiii.value].values - test[T.hb.value].values
     
     larguras_lhc = [l+"_median" for l in larguras]
-    train_lhc = p.lhs_subsample_with_stats(train, p.features, larguras, n=4000, k_neighbors=100)
-    test_lhc = p.lhs_subsample_with_stats(test, p.features, larguras, n=1000, k_neighbors=100)
+    train_lhc = p.lhs_subsample_with_stats(train, p.features, larguras, n=2000, k_neighbors=100)
     print("Amostras LHC para treinamento e teste geradas com sucesso!")
     
     modelos = {}  # Dicionário para armazenar os modelos
@@ -55,52 +54,56 @@ if __name__ == "__main__":
             for l1, l2 in p.cov_pairs
         ]
     )
-
-    # Configuração do Operon
-    config_operon = {
-        "random_state": RANDOM_SEED,
-        "population_size": 2000,
-        "generations": 2000,
-        "allowed_symbols": "add,sub,mul,aq,constant,variable,pow,exp,tanh",
-        "max_length": 25,
-        "max_depth": 100,
-        "optimizer_iterations": 1000,
-        "model_selection_criterion": "bayesian_information_criterion",
-        "objectives": ["r2", "length"],
-        "n_threads": 12,
-    }
-    
-    # Treinar operon para todas as células
-    treinar_modelos_operon(config_operon, X_train_bins, items, False)
-    p.salva_equacoes_operon(modelos, "n4d_all")
-    
-    p.inspecao_modelos(modelos, train_lhc, p.features, modelo)
-    plt.savefig(f"results/regressoes/{modelo}_meanstds_n4d_all_{RANDOM_SEED}.png", bbox_inches="tight")
-    plt.close()
-
-    p.inspecao_modelos_covs(modelos, train_lhc, p.features, modelo)
-    plt.savefig(f"results/regressoes/{modelo}_covs_n4d_all_{RANDOM_SEED}.png", bbox_inches="tight")
-    plt.close()
+    n_jobs = 32  # Número de threads para paralelização
 
     KMAX = 100
     ALPHA = 0.05
     BEST_SEED = 0
     BEST_SCORE = np.inf
     BEST_OTIMO = False
+    MODEL_SEED = 4321
+    TREINAR = "primeira"
+
+    if TREINAR not in ["primeira", "todas", "nunca"]:
+        raise ValueError("TREINAR deve ser 'primeira', 'todas' ou 'nunca'.")
 
     p_energy = 0
     p_wasserstein = 0
     p_ks2d = 0
-    
+    historico = []
+
     k = 0
     while k < KMAX:
         k += 1
         RANDOM_SEED = np.random.randint(10000, 20000)
         print(f"\n\nIteração {k}/{KMAX} - Seed aleatória: {RANDOM_SEED}")
+
+        if TREINAR == "todas":
+            MODEL_SEED = RANDOM_SEED
+
+        # Configuração do Operon
+        config_operon = {
+            "random_state": MODEL_SEED,
+            "population_size": 2000,
+            "generations": 2000,
+            "allowed_symbols": "add,sub,mul,aq,constant,variable,pow,exp,tanh",
+            "max_length": 25,
+            "max_depth": 100,
+            "optimizer_iterations": 1000,
+            "model_selection_criterion": "bayesian_information_criterion",
+            "objectives": ["r2", "length"],
+            "n_threads": n_jobs
+        }
         
+        # Treinar operon para todas as células
+        treinar_modelos_operon(config_operon, X_train_bins, items, TREINAR != "nunca")
+        p.salva_equacoes_operon(modelos, "n4d_all")
+
+        if TREINAR == "primeira":
+            TREINAR = "nunca"  # Não treinar mais modelos nas próximas iterações
+ 
         print("Gerando novas amostras!")
-        p_correcao = p.gerar_amostras(modelos, modelo, test, test_lhc)
-        print(f"Porcentagem de matrizes corrigidas: {p_correcao:.2f}%")
+        p.gerar_amostras(modelos, modelo, test)
         
         # Ler amostras geradas
         df_amostras = pd.read_csv(f"results/amostras_all_{modelo}.csv")
@@ -117,14 +120,14 @@ if __name__ == "__main__":
         res_energy = energy_test_repeated(
             test[T.nii_ha.value], test[T.oiii_hb.value],
             df_amostras[T.nii_ha.value], df_amostras[T.oiii_hb.value],
-            n_repeats=200, n_max=500, n_perm=199, n_jobs=12
+            n_repeats=200, n_max=500, n_perm=199, n_jobs=n_jobs
         )
 
         # 2) Distância de Wasserstein (transporte de massa ótimo)
         res_wasserstein = wasserstein_test(
             test[T.nii_ha.value], test[T.oiii_hb.value],
             df_amostras[T.nii_ha.value], df_amostras[T.oiii_hb.value],
-            n_max=250, n_perm=199, n_jobs=12
+            n_max=250, n_perm=199, n_jobs=n_jobs
         )
         
         # 3) Distância de Bhattacharyya entre as densidades 2D no BPT
@@ -138,7 +141,7 @@ if __name__ == "__main__":
         res_ks2d = ks_test_2d(
             test[T.nii_ha.value], test[T.oiii_hb.value],
             df_amostras[T.nii_ha.value], df_amostras[T.oiii_hb.value],
-            n_max=2000, n_perm=999, random_state=RANDOM_SEED, n_jobs=12
+            n_max=2000, n_perm=999, random_state=RANDOM_SEED, n_jobs=n_jobs
         )
         res_kde_diff = p.plot_kde_diff_bpt(
             test[T.nii_ha.value], test[T.oiii_hb.value],
@@ -163,11 +166,21 @@ if __name__ == "__main__":
         p_wasserstein = df_resumo["wasserstein"].values[0]
         p_ks2d = df_resumo["ks2d"].values[0]
         d_ks2d = df_resumo["ks2d_D"].values[0]
+        d_kl = res_kde_diff["kl"]
+
+        historico.append({
+            "seed": RANDOM_SEED,
+            "p_energy": p_energy,
+            "p_wasserstein": p_wasserstein,
+            "d_ks2d": d_ks2d,
+            "d_kl": d_kl,
+        })
 
         print(f"\nResumo das estatísticas de ajuste bidimensional no BPT para {modelo}:")
         print(f"Energy     : {p_energy:.4f}")
         print(f"Wasserstein: {p_wasserstein:.4f}")
         print(f"KS-2D Dist.: {d_ks2d:.4f} (p = {p_ks2d:.4f})")
+        print(f"D_KL       : {d_kl:.4f}")
 
         # Score = estatística D do KS-2D; quanto menor, mais próximas as duas
         # distribuições espacialmente. Guarda a melhor seed já vista, mesmo
@@ -192,3 +205,18 @@ if BEST_OTIMO:
 else:
     print(f"\nNenhuma seed atingiu todos os p-values > {ALPHA:.1e} em {KMAX} iterações.")
     print(f"Melhor seed encontrada mesmo assim (menor KS-2D D): {BEST_SEED} (D={BEST_SCORE:.4f})")
+
+if historico:
+    df_historico = pd.DataFrame(historico)
+    df_historico.to_csv(f"results/rndsrc_{modelo}_{MODEL_SEED}.csv", index=False)
+    melhor_energy = df_historico.loc[df_historico["p_energy"].idxmax()]
+    melhor_wasserstein = df_historico.loc[df_historico["p_wasserstein"].idxmax()]
+    melhor_ks2d = df_historico.loc[df_historico["d_ks2d"].idxmin()]
+    melhor_kl = df_historico.loc[df_historico["d_kl"].idxmin()]
+
+    print("\n" + "="*50)
+    print("Melhores seeds por métrica:")
+    print(f"Maior p_energy      : seed {int(melhor_energy['seed'])} (p_energy={melhor_energy['p_energy']:.4f})")
+    print(f"Maior p_wasserstein : seed {int(melhor_wasserstein['seed'])} (p_wasserstein={melhor_wasserstein['p_wasserstein']:.4f})")
+    print(f"Menor d_ks2d        : seed {int(melhor_ks2d['seed'])} (d_ks2d={melhor_ks2d['d_ks2d']:.4f})")
+    print(f"Menor d_kl          : seed {int(melhor_kl['seed'])} (d_kl={melhor_kl['d_kl']:.4f})")
