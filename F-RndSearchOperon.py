@@ -56,7 +56,7 @@ if __name__ == "__main__":
     )
     n_jobs = 32  # Número de threads para paralelização
 
-    KMAX = 100
+    KMAX = 500
     ALPHA = 0.05
     BEST_SEED = 0
     BEST_SCORE = np.inf
@@ -112,7 +112,7 @@ if __name__ == "__main__":
         df_amostras[T.nii_ha.value] = df_amostras[T.nii.value] - df_amostras[T.ha.value]
         df_amostras[T.oiii_hb.value] = df_amostras[T.oiii.value] - df_amostras[T.hb.value]
         
-        p.show_bpt(df_amostras, F.azmass.value, title="Estimadores Operon + Amostras Normal4D")
+        p.show_bpt(df_amostras, F.azmass.value, title="Operon Estimators + Normal4D Samples")
         plt.savefig(f"results/diagramas/bpt_cores_amostras_n4d_all_{modelo}_{RANDOM_SEED}.png", bbox_inches="tight")
         plt.close()
 
@@ -120,7 +120,7 @@ if __name__ == "__main__":
         res_energy = energy_test_repeated(
             test[T.nii_ha.value], test[T.oiii_hb.value],
             df_amostras[T.nii_ha.value], df_amostras[T.oiii_hb.value],
-            n_repeats=200, n_max=500, n_perm=199, n_jobs=n_jobs
+            n_max=500, n_perm=199, n_jobs=n_jobs
         )
 
         # 2) Distância de Wasserstein (transporte de massa ótimo)
@@ -130,14 +130,7 @@ if __name__ == "__main__":
             n_max=250, n_perm=199, n_jobs=n_jobs
         )
         
-        # 3) Distância de Bhattacharyya entre as densidades 2D no BPT
-        res_bhatt = bhattacharyya_distance_2d(
-            test[T.nii_ha.value], test[T.oiii_hb.value],
-            df_amostras[T.nii_ha.value], df_amostras[T.oiii_hb.value],
-            bins=80, xlim=(-2, 1), ylim=(-1.5, 1.4),
-        )
-        
-        # 4) Diferença de densidades KDE 2D + testes KL e KS-2D
+        # 3) Diferença de densidades KDE 2D + testes KL e KS-2D
         res_ks2d = ks_test_2d(
             test[T.nii_ha.value], test[T.oiii_hb.value],
             df_amostras[T.nii_ha.value], df_amostras[T.oiii_hb.value],
@@ -146,8 +139,8 @@ if __name__ == "__main__":
         res_kde_diff = p.plot_kde_diff_bpt(
             test[T.nii_ha.value], test[T.oiii_hb.value],
             df_amostras[T.nii_ha.value], df_amostras[T.oiii_hb.value],
-            label1="Validation Set", label2="Amostras Normal4D",
-            titulo=f"Diferença de densidades KDE no BPT - {modelo}",
+            label1="Validation Set", label2="Normal4D Samples",
+            titulo=f"KDE density difference in the BPT diagram",
             ks=res_ks2d,
         )
         plt.savefig(f"results/correlacoes/bpt_kde_diff_n4d_all_{modelo}_{RANDOM_SEED}.png", bbox_inches="tight")
@@ -157,7 +150,6 @@ if __name__ == "__main__":
         df_resumo = pd.DataFrame([{
             "energy": res_energy["p_value"].mean(),
             "wasserstein": res_wasserstein["p_value"],
-            "bhattacharyya": res_bhatt["distance"],
             "ks2d": res_ks2d["p_value"],
             "ks2d_D": res_ks2d["D"],
         }], index=[modelo])

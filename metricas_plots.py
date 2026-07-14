@@ -201,7 +201,7 @@ def tabela_ocupacao_bpt(conjuntos):
     return pd.DataFrame(linhas).set_index("conjunto")[["SF", "Composite", "AGN"]]
 
 
-def plot_ocupacao_bpt(df_ocupacao, titulo="Ocupação das regiões do diagrama BPT", ax=None):
+def plot_ocupacao_bpt(df_ocupacao, titulo="Occupation of the BPT diagram regions", ax=None):
     """Barras horizontais 100% empilhadas (mesma área total) comparando a
     ocupação SF/Composite/AGN entre os conjuntos indexados em df_ocupacao."""
     cores = {"SF": "royalblue", "Composite": "seagreen", "AGN": "firebrick"}
@@ -218,7 +218,7 @@ def plot_ocupacao_bpt(df_ocupacao, titulo="Ocupação das regiões do diagrama B
         )
         esquerda += df_ocupacao[classe].values
     ax.set_xlim(0, 100)
-    ax.set_xlabel("Ocupação (%)", fontsize="large")
+    ax.set_xlabel("Occupation (%)", fontsize="large")
     ax.set_title(titulo, fontsize="x-large", pad=40)
     ax.invert_yaxis()
     ax.legend(loc="lower center", bbox_to_anchor=(0.5, 0.9), ncol=3, fontsize="medium")
@@ -289,7 +289,7 @@ def energy_test(x1, y1, x2, y2, n_max=1000, n_perm=499, random_state=RANDOM_SEED
 
 
 def energy_test_repeated(
-    x1, y1, x2, y2, n_repeats=100, n_max=1000, n_perm=499, random_state=RANDOM_SEED, n_jobs=12
+    x1, y1, x2, y2, n_repeats=200, n_max=500, n_perm=199, random_state=RANDOM_SEED, n_jobs=12
 ):
     """
     Repete `energy_test` `n_repeats` vezes, cada uma com uma sub-amostragem
@@ -585,16 +585,16 @@ class PlotsMetricas(object):
         plt.scatter(
             dados[col_x], dados[col_y], alpha=0.5, color="gray", s=2, edgecolors="none"
         )
-        plt.plot(centers, medias, "k-", linewidth=1.5, label="Média por bin")
+        plt.plot(centers, medias, "k-", linewidth=1.5, label="Bin mean")
         plt.fill_between(
             centers,
             medias - stds,
             medias + stds,
             alpha=0.3,
             color="red",
-            label=r"$\pm 1 \sigma$ por bin",
+            label=r"$\pm 1 \sigma$ per bin",
         )
-        plt.title(r"Correlação entre bins e médias: $r_s = %.3f$" % corr)
+        plt.title(r"Correlation between bins and means: $r_s = %.3f$" % corr)
         plt.xlabel(self.unidades[col_x])
         plt.ylabel(self.unidades[col_y])
         plt.ylim(medias.min() - 2 * stds.max(), medias.max() + 2 * stds.max())
@@ -619,8 +619,8 @@ class PlotsMetricas(object):
             dados[col_x], dados[col_y], alpha=0.5, color="gray", s=2, edgecolors="none"
         )
 
-        plt.plot(centers, medias, "k-", linewidth=1.5, label="Média real", color="blue")
-        plt.plot(X, medias_s, "k-", linewidth=1.5, label="Média estimada")
+        plt.plot(centers, medias, "k-", linewidth=1.5, label="Actual mean", color="blue")
+        plt.plot(X, medias_s, "k-", linewidth=1.5, label="Estimated mean")
 
         plt.fill_between(
             centers,
@@ -628,7 +628,7 @@ class PlotsMetricas(object):
             medias + stds,
             alpha=0.4,
             color="red",
-            label=r"$\pm 1 \sigma$ real",
+            label=r"$\pm 1 \sigma$ (actual)",
         )
         plt.fill_between(
             X,
@@ -636,10 +636,10 @@ class PlotsMetricas(object):
             medias_s + stds_s,
             alpha=0.3,
             color="orange",
-            label=r"$\pm 1 \sigma$ estimado",
+            label=r"$\pm 1 \sigma$ (estimated)",
         )
         plt.title(
-            r"Correlação entre médias reais e as estimadas: $r_s = %.3f$" % corr_s
+            r"Correlation between actual and estimated means: $r_s = %.3f$" % corr_s
         )
         plt.xlabel(self.unidades[col_x])
         plt.ylabel(self.unidades[col_y])
@@ -779,12 +779,12 @@ class PlotsMetricas(object):
 
         fig, axes = plt.subplots(4, 2, figsize=(12, 14))
         fig.suptitle(
-            f"Qualidade dos Modelos {titulo} para Médias e Desvios-padrão: Predições vs Valores Reais",
+            f"Quality of the {titulo} Models for Means and Standard Deviations: Predicted vs. Actual Values",
             fontsize=16,
             y=0.995,
         )
 
-        # Médias
+        # Means
         for idx, linha in enumerate(self.targets[:4]):
             ax_mean = axes[idx, 0]
             y_true_mean = dados_bins[f"{linha}_mean"].values
@@ -799,12 +799,12 @@ class PlotsMetricas(object):
                 alpha=0.5,
             )
             ax_mean.scatter(y_true_mean, y_pred_mean, alpha=0.75, s=20)
-            ax_mean.set_xlabel("Real")
-            ax_mean.set_ylabel("Predito")
+            ax_mean.set_xlabel("Actual")
+            ax_mean.set_ylabel("Predicted")
             ax_mean.set_title(f"MEAN({linha}), $R^2$ = {r2_mean:.4f}")
             ax_mean.grid(True, alpha=0.3)
 
-        # Desvios-padrão
+        # Standard deviations
         for idx, linha in enumerate(self.targets[:4]):
             ax_std = axes[idx, 1]
             y_true_std = dados_bins[f"{linha}_std"].values
@@ -819,8 +819,8 @@ class PlotsMetricas(object):
                 alpha=0.5,
             )
             ax_std.scatter(y_true_std, y_pred_std, alpha=0.75, s=20, color="orange")
-            ax_std.set_xlabel("Real")
-            ax_std.set_ylabel("Predito")
+            ax_std.set_xlabel("Actual")
+            ax_std.set_ylabel("Predicted")
             ax_std.set_title(f"STD({linha}), $R^2$ = {r2_std:.4f}")
             ax_std.grid(True, alpha=0.3)
 
@@ -842,7 +842,7 @@ class PlotsMetricas(object):
 
         fig, axes = plt.subplots(3, 2, figsize=(12, 10.5))
         fig.suptitle(
-            f"Qualidade dos Modelos {titulo} para Covariâncias: Predições vs Valores Reais",
+            f"Quality of the {titulo} Models for Covariances: Predicted vs. Actual Values",
             fontsize=16,
             y=0.995,
         )
@@ -863,8 +863,8 @@ class PlotsMetricas(object):
                 "r--",
                 alpha=0.5,
             )
-            ax.set_xlabel("Real")
-            ax.set_ylabel("Predito")
+            ax.set_xlabel("Actual")
+            ax.set_ylabel("Predicted")
             ax.set_title(f"COV({l1}, {l2}), $R^2$ = {r2_cov:.4f}")
             ax.grid(True, alpha=0.3)
 
@@ -892,11 +892,11 @@ class PlotsMetricas(object):
         plt.plot(
             X_test[order],
             y_pred[order],
-            label=r"$\text{Mediana}_{\text{Operon}}$",
+            label=r"$\text{Median}_{\text{Operon}}$",
             color="green",
         )
-        title = "Operon com Split-Conformal"
-        label = "Amostras no CI"
+        title = "Operon with Split-Conformal"
+        label = "Samples within CI"
         if coverage > 0:
             plt.fill_between(
                 X_test[order],
@@ -907,7 +907,7 @@ class PlotsMetricas(object):
                 color="green",
             )
             title += f", coverage={coverage:.3f}"
-            label = "Conjunto de teste"
+            label = "Test set"
         plt.title(title)
         plt.scatter(X_test, y_test, color="red", alpha=0.6, label=label, s=2)
         plt.xlabel(col_x)
@@ -944,9 +944,9 @@ class PlotsMetricas(object):
         self,
         dados,
         color=None,
-        title="Dados reais da síntese",
+        title="Actual synthesis data",
         densities=False,
-        show=True,
+        show=False,
         known_x=None,
         known_y=None,
         background_x=None,
@@ -974,7 +974,7 @@ class PlotsMetricas(object):
                     background_y,
                     cor="dimgray",
                     linestyle="--",
-                    label=f"Níveis de densidade ({background_label})",
+                    label=f"Density levels ({background_label})",
                 )
         if known_x is not None and known_y is not None:
             ax.scatter(
@@ -1014,7 +1014,7 @@ class PlotsMetricas(object):
             cbar.set_label(color, rotation=90, labelpad=2)
         if densities:
             self.curvas_densidade_norm(dados[T.nii_ha.value], dados[T.oiii_hb.value])
-        self.bpt_config("Diagrama BPT: %s" % title, "EW ")
+        self.bpt_config("BPT diagram: %s" % title, "EW ")
         if show:
             plt.show()
 
@@ -1022,9 +1022,9 @@ class PlotsMetricas(object):
         self,
         dados,
         color=None,
-        title="Dados reais da síntese",
+        title="Actual synthesis data",
         densities=False,
-        show=True,
+        show=False,
         known_x=None,
         known_y=None,
     ):
@@ -1068,7 +1068,7 @@ class PlotsMetricas(object):
             cbar.set_label(color, rotation=90, labelpad=2)
         if densities:
             self.curvas_densidade(dados[T.nii_ha.value], dados[T.ha.value])
-        self.whan_config("Diagrama WHAN: %s" % title, "EW ")
+        self.whan_config("WHAN diagram: %s" % title, "EW ")
         if show:
             plt.show()
 
@@ -1241,7 +1241,7 @@ class PlotsMetricas(object):
     def histogram(self, esperado, modelado, label1, label2, title):
         legend = "%s \n" % (label1) + self.pdf_tests(esperado, modelado)
         plt.subplots(figsize=(10, 4))
-        plt.hist(esperado, bins=50, alpha=0.95, label="Síntese" + label2, density=False)
+        plt.hist(esperado, bins=50, alpha=0.95, label="Synthesis" + label2, density=False)
         plt.hist(
             modelado, bins=50, color="red", alpha=0.65, label=legend, density=False
         )
@@ -1256,7 +1256,7 @@ class PlotsMetricas(object):
     def kde_plot(self, esperado, modelado, label1, label2, title, metrica):
         legend = "%s \n" % (label1) + self.pdf_tests(esperado, modelado, metrica)
         plt.subplots(figsize=(10, 4))
-        sns.kdeplot(data=esperado, label="Síntese" + label2, alpha=0.6)
+        sns.kdeplot(data=esperado, label="Synthesis" + label2, alpha=0.6)
         sns.kdeplot(data=modelado, label=legend, alpha=0.6)
         # plt.xlim([-2, 1.5])
         plt.title(f"{title} PDF")
@@ -1323,9 +1323,9 @@ class PlotsMetricas(object):
         )
         plt.subplots(figsize=(10, 5))
         if col == None:
-            plt.title("Métricas")
+            plt.title("Metrics")
         else:
-            plt.title("Métricas: %s" % (col))
+            plt.title("Metrics: %s" % (col))
         plt.plot(
             range(1, len(dados[metrica]) + 1),
             dados[metrica],
@@ -1384,7 +1384,7 @@ class PlotsMetricas(object):
         )
         plt.plot(self.targets, dados_false[metrica], "r-", label=label_mean)
 
-        plt.title("Métricas Operon")
+        plt.title("Operon Metrics")
         plt.ylabel("MSE")
         plt.xticks(range(0, len(dados_true[metrica])), rotation=45, fontsize=7)
         plt.tick_params(axis="y", labelcolor="r")
@@ -1401,8 +1401,8 @@ class PlotsMetricas(object):
         plt.xlim(min(y_pred), max(y_pred))
         plt.ylim(min(y_pred), max(y_pred))
 
-        plt.xlabel("Real")
-        plt.ylabel("Predito")
+        plt.xlabel("Actual")
+        plt.ylabel("Predicted")
         plt.title("%s - %s" % (modelo, coluna))
         plt.legend()
         plt.tight_layout()
@@ -1438,8 +1438,8 @@ class PlotsMetricas(object):
 
     def histogram_h(self, dados, title, density=False, lim=None, cor=None, bins=100):
         plt.subplots(figsize=(5 * self.phi, 5))
-        plt.ylabel("Valor")
-        plt.xlabel("Contagem")
+        plt.ylabel("Value")
+        plt.xlabel("Count")
         if lim is not None:
             plt.ylim(lim)
         plt.hist(dados, bins=bins, orientation="horizontal", density=density, color=cor)
@@ -1476,14 +1476,14 @@ class PlotsMetricas(object):
             s=0.5,
             color="gray",
             alpha=0.5,
-            label="Dados",
+            label="Data",
         )
         plt.scatter(
             x=df_medians["center"],
             y=df_medians["median"],
             s=3,
             color="red",
-            label="Medianas",
+            label="Medians",
         )
         plt.xlabel(col_x, fontsize="large")
         plt.ylabel(col_y, fontsize="large")
@@ -1505,27 +1505,27 @@ class PlotsMetricas(object):
             plt.plot(
                 medians["center"][5:M],
                 pvalues[0, : M - 5],
-                label="P-value à esquerda",
+                label="P-value (left)",
                 color="red",
             )
             plt.plot(
                 medians["center"][5:M],
                 pvalues[1, : M - 5],
-                label="P-value à direita",
+                label="P-value (right)",
                 color="green",
             )
-            plt.vlines(corte, -0.1, 1.1, "purple", label="Corte: %.2f" % corte)
+            plt.vlines(corte, -0.1, 1.1, "purple", label="Cutoff: %.2f" % corte)
             plt.hlines(
                 0.05,
                 min(medians["center"][5:M]),
                 max(medians["center"][5:M]),
                 "blue",
                 "dashed",
-                label="Nível de significância = 0.05",
+                label="Significance level = 0.05",
             )
             plt.xlabel(col_x)
             plt.ylabel(col_y)
-            plt.title("Teste de Breusch-Pagan para Homocedasticidade")
+            plt.title("Breusch-Pagan Test for Homoscedasticity")
             plt.legend()
             plt.grid(True)
             plt.show()
@@ -1654,20 +1654,20 @@ class PlotsMetricas(object):
             histtype="step",
             color="blue",
             alpha=0.5,
-            label="Dados",
+            label="Data",
         )
         x = np.linspace(min(dados), 2, 100)
         pdf = stats.t.pdf(x, df, loc, scale)
-        plt.plot(x, pdf, "r-", label="Distribuição t-Student Ajustada")
-        plt.xlabel("Valor")
-        plt.ylabel("Densidade")
-        plt.title("Ajuste da Distribuição t-Student")
+        plt.plot(x, pdf, "r-", label="Fitted Student's t Distribution")
+        plt.xlabel("Value")
+        plt.ylabel("Density")
+        plt.title("Student's t Distribution Fit")
         plt.xlim(min(dados), 2)
         plt.legend()
         plt.show()
 
     def plotly_entropy(self, df, loss="loss"):
-        fig = px.scatter(df, x="complexity", y=loss, title="Fronteira de Pareto")
+        fig = px.scatter(df, x="complexity", y=loss, title="Pareto Front")
         fig.update_xaxes(tickvals=df["complexity"])
         # Calcular a inclinação para cada par de pontos consecutivos
         inclinacoes = []
@@ -1779,14 +1779,14 @@ class PlotsMetricas(object):
         ajuste = median["center"] >= corte
 
         fig, ax = plt.subplots(figsize=(8.5, 5.5))
-        ax.scatter(x=dados[x], y=dados[y], s=1, color="lightgray", label="Dados")
+        ax.scatter(x=dados[x], y=dados[y], s=1, color="lightgray", label="Data")
 
         ax.scatter(
             x=median["center"][ajuste],
             y=median["median"][ajuste],
             s=2,
             color="red",
-            label="Medianas",
+            label="Medians",
         )
         ax.scatter(
             x=median["center"][~ajuste],
@@ -1805,7 +1805,7 @@ class PlotsMetricas(object):
 
         ax.set_xlabel(self.unidades[x], fontsize="x-large")
         ax.set_ylabel(self.unidades[y], fontsize="x-large")
-        ax.set_title("Dados & Medianas", fontsize="xx-large")
+        ax.set_title("Data & Medians", fontsize="xx-large")
         ax.legend(fontsize="large")
 
         plt.show()
@@ -1858,7 +1858,7 @@ class PlotsMetricas(object):
             X,
             Y,
             color="green",
-            label="Complex.: %d | Mse: %.4f | Mae: %.4f" % (complexity, mse, mae),
+            label="Complexity: %d | MSE: %.4f | MAE: %.4f" % (complexity, mse, mae),
         )
 
         ax[0].set_ylabel(self.unidades[y], fontsize="x-large")
@@ -1866,13 +1866,13 @@ class PlotsMetricas(object):
             ax[0].set_title(titulo, fontsize="xx-large")
         ax[0].legend(fontsize="large")
 
-        # Gráfico de resíduos (parte inferior)
+        # Residuals plot (bottom panel)
         residuos = median["median"] - Y
         ax[1].scatter(median["center"], residuos, s=2, color="blue")
         ax[1].axhline(0, color="black", linestyle="dashed")
 
         ax[1].set_xlabel(self.unidades[x], fontsize="x-large")
-        ax[1].set_ylabel("Resíduos", fontsize="x-large")
+        ax[1].set_ylabel("Residuals", fontsize="x-large")
 
         if save:
             plt.savefig("./regressoes/reg_%s_%s_%d.png" % (x, y, complexity), dpi=100)
@@ -1889,7 +1889,7 @@ class PlotsMetricas(object):
         # mad_m10 = medians['mads'].rolling(window=10).mean()
         # -----------------------------
         plt.figure(figsize=(8, 8 / 3 * 2))
-        plt.plot(medians["center"], medians["median"], color="blue", label="Medianas")
+        plt.plot(medians["center"], medians["median"], color="blue", label="Medians")
         plt.scatter(
             x=medians["center"],
             y=medians["median"] + medians["mads"],
@@ -1918,7 +1918,7 @@ class PlotsMetricas(object):
         # -----------------------------
         plt.figure(figsize=(8, 8 / 3 * 2))
         plt.scatter(
-            x=medians["center"], y=medians["median"], s=2, label="Medianas", color="red"
+            x=medians["center"], y=medians["median"], s=2, label="Medians", color="red"
         )
         if cortes is not None:
             plt.vlines(
@@ -1926,7 +1926,7 @@ class PlotsMetricas(object):
                 np.min(medians["median"]),
                 np.max(medians["median"]),
                 color="purple",
-                label="Corte: %.2f" % (cortes[0]),
+                label="Cutoff: %.2f" % (cortes[0]),
             )
             plt.vlines(
                 cortes[1],
@@ -1943,7 +1943,7 @@ class PlotsMetricas(object):
             )
         plt.xlabel(self.unidades[col_x])
         plt.ylabel(self.unidades[col_y])
-        plt.title("Medianas e regimes de desvios-padrão")
+        plt.title("Medians and standard-deviation regimes")
         plt.legend()
         plt.show()
 
@@ -2105,7 +2105,7 @@ class PlotsMetricas(object):
         ax.set_xlabel(metrica)
         ax.legend()
 
-        plt.title("%s do conjunto de validação" % metrica)
+        plt.title("%s on the validation set" % metrica)
         plt.xlim(0, vmax)
         plt.subplots_adjust(left=0.15, right=0.95, bottom=0.1, top=0.9)
         plt.show()
@@ -2116,13 +2116,13 @@ class PlotsMetricas(object):
             medians_50["center"],
             medians_50["std"],
             color="red",
-            label=r"$\sigma $ por bin",
+            label=r"$\sigma$ per bin",
         )
         plt.hlines(
             np.std(dados[col_x]),
             np.min(medians_50["center"]),
             np.max(medians_50["center"]),
-            label=r"$\sigma $ geral",
+            label=r"$\sigma$ overall",
         )
         plt.legend()
         plt.ylabel(r"$\sigma $(%s)" % col_y)
@@ -2133,7 +2133,7 @@ class PlotsMetricas(object):
         slope, intercept, r_value, p_value, std_err = stats.linregress(x, y)
 
         # Plot the data and the fit
-        plt.scatter(x, y, s=5, label="Desvio por bin", color="blue")
+        plt.scatter(x, y, s=5, label="Std. deviation per bin", color="blue")
         plt.plot(
             x,
             slope * x + intercept,
@@ -2157,7 +2157,7 @@ class PlotsMetricas(object):
         y_fit = polynomial(x_fit)
 
         # Plot original data and fitted curve
-        plt.scatter(x, y, s=5, label="Desvio por bin", color="blue")
+        plt.scatter(x, y, s=5, label="Std. deviation per bin", color="blue")
         plt.plot(x_fit, y_fit, label="Cubic fit", color="red")
         plt.xlabel(col_x)
         plt.ylabel("Std(%s)" % col_y)
@@ -2201,7 +2201,7 @@ class PlotsMetricas(object):
             x_ka03, ka_03, "-", color="green", alpha=0.8, label="Ka03"
         )  #: pure star formation <")
         plt.text(-1.5, -0.5, "SF")
-        plt.text(-0.1, -1.0, "Mix.")
+        plt.text(-0.1, -1.0, "Comp.")
         plt.text(0.6, 0.6, "AGN")
 
     # Plot BPT Diagrams
@@ -2228,7 +2228,7 @@ class PlotsMetricas(object):
                 alpha = 0.3
             else:
                 alpha = 0.3
-            lbl = "Síntese"
+            lbl = "Synthesis"
 
         # Quantis
         if len(qmin) > 0 and len(qmin) == len(qmax):
@@ -2266,7 +2266,7 @@ class PlotsMetricas(object):
             self.curvas_densidade(bptx_pred, bpty_pred)
 
         # Configurações do gráfico
-        plt.title("Diagrama BPT", fontsize="xx-large")
+        plt.title("BPT diagram", fontsize="xx-large")
         plt.xlabel(r"$log_{10}$(W[NII] / WH$\alpha$)", fontsize="large")
         plt.ylabel(r"$log_{10}$(W[OIII] / WH$\beta$)", fontsize="large")
 
@@ -2314,7 +2314,7 @@ class PlotsMetricas(object):
         plt.text(0.4, 0, "RG")
         plt.text(-0.3, -0.55, "Passive")
 
-    def whan_config(self, titulo="Diagrama WHAN", sfx=""):
+    def whan_config(self, titulo="WHAN diagram", sfx=""):
         self.plot_KeKa06()  # linhas de separação teóricas
         plt.title(titulo, fontsize="x-large")
         plt.xlabel(r"$log_{10}$(%s[NII] / %sH$\alpha$)" % (sfx, sfx), fontsize="large")
@@ -2329,7 +2329,7 @@ class PlotsMetricas(object):
 
     def curvas_densidade(
         self, dados_x, dados_y, levels=True, cor="black", linestyle="-",
-        label="Níveis de densidade numérica",
+        label="Numerical density levels",
     ):
         if levels:
             X, Y, Z, lvls = self.get_levels(dados_x, dados_y)
@@ -2350,7 +2350,7 @@ class PlotsMetricas(object):
 
     def _desenha_contorno_niveis(
         self, X, Y, Z, densities_pts, ax=None, cor="black", linestyle="-",
-        label="Níveis de densidade",
+        label="Density levels",
     ):
         # Estilo padrão dos contornos do BPT (usado por show_bpt via
         # curvas_densidade_norm e por plot_kde_diff_bpt): níveis nos quantis
@@ -2370,7 +2370,7 @@ class PlotsMetricas(object):
 
     def curvas_densidade_norm(
         self, dados_x, dados_y, bins=100, xlim=(-2, 1), ylim=(-1.5, 1.4),
-        cor="black", linestyle="-", label="Níveis de densidade numérica",
+        cor="black", linestyle="-", label="Numerical density levels",
     ):
         # Mesma densidade (grade fixa + normalização) usada em plot_kde_diff_bpt,
         # para que os contornos aqui combinem com o mapa de diferença de lá.
@@ -2381,7 +2381,7 @@ class PlotsMetricas(object):
         self._desenha_contorno_niveis(X, Y, Z, densities, cor=cor, linestyle=linestyle, label=label)
         return X, Y, Z
 
-    def bpt_config(self, title="Diagrama BPT", sfx=""):
+    def bpt_config(self, title="BPT diagram", sfx=""):
         self.plot_KeKa()  # Linhas de separação teóricas
         plt.xlabel(r"$log_{10}$(%s[NII] / %sH$\alpha$)" % (sfx, sfx), fontsize="large")
         plt.ylabel(r"$log_{10}$(%s[OIII] / %sH$\beta$)" % (sfx, sfx), fontsize="large")
@@ -2395,9 +2395,9 @@ class PlotsMetricas(object):
     def plot_kde_diff_bpt(
         self,
         x1, y1, x2, y2,
-        label1="Observado", label2="Amostrado",
+        label1="Observed", label2="Sampled",
         bins=100, xlim=(-2, 1), ylim=(-1.5, 1.4),
-        titulo="Diferença de densidades KDE no BPT",
+        titulo="KDE density difference in the BPT diagram",
         ks=None,
     ):
         """
@@ -2432,8 +2432,8 @@ class PlotsMetricas(object):
         plt.sca(ax)
         self.bpt_config(
             f"{titulo}\n"
-            r"$D_{KL}$ = %.4f, KS-2D D = %.4f (p = %.4f)"
-            % (kl, ks["D"], ks["p_value"]),
+            r"$D_{KL}$ = %.4f, $D_{KS}$ = %.4f"
+            % (kl, ks["D"]),
             "",
         )
 
@@ -2441,11 +2441,11 @@ class PlotsMetricas(object):
         # tracejado, amostra em preto sólido, ambos com entrada na legenda.
         self._desenha_contorno_niveis(
             Xg, Yg, Z1, dens1_pts, ax=ax, cor="white", linestyle="-.",
-            label=f"Níveis de densidade ({label1})",
+            label=f"Density levels ({label1})",
         )
         self._desenha_contorno_niveis(
             Xg, Yg, Z2, dens2_pts, ax=ax, cor="black", linestyle="-",
-            label=f"Níveis de densidade ({label2})",
+            label=f"Density levels ({label2})",
         )
 
         ax.legend(loc="lower left", fontsize="small")
@@ -2460,7 +2460,7 @@ class PlotsMetricas(object):
         bptx,
         bpty,
         complexity=[],
-        titulo="Dados & Operon + Quantílica",
+        titulo="Data & Operon + Quantile Regression",
     ):
         # Todos os dados da síntese
         X_sin = dados[col_x]
@@ -2477,7 +2477,7 @@ class PlotsMetricas(object):
                 complexity[3],
             )
         else:
-            label = "Medianas ~%s" % col_x
+            label = "Medians ~%s" % col_x
 
         plt.subplots(figsize=(12, 8))
         self.plot_KeKa()
@@ -2485,7 +2485,7 @@ class PlotsMetricas(object):
         plt.colorbar(xy).set_label(self.unidades[col_x], fontsize="xx-large")
         plt.scatter(x=bptx, y=bpty, color="black", s=3, label=label)
 
-        plt.title("Diagrama BPT: %s" % titulo, fontsize="xx-large")
+        plt.title("BPT diagram: %s" % titulo, fontsize="xx-large")
         plt.xlabel(r"$log_{10}$(NII / H$\alpha$)", fontsize="xx-large")
         plt.ylabel(r"$log_{10}$(OIII / H$\beta$)", fontsize="xx-large")
         plt.xticks(fontsize=16)
@@ -2505,7 +2505,7 @@ class PlotsMetricas(object):
         bptx,
         bpty,
         complexity=[],
-        titulo="Medianas & Operon + Quantílica",
+        titulo="Medians & Operon + Quantile Regression",
     ):
 
         medians_nii = self.bins_and_medians(dados[col_x], dados[T.nii.value], M)
@@ -2527,7 +2527,7 @@ class PlotsMetricas(object):
                 complexity[3],
             )
         else:
-            label = "Medianas ~%s" % col_x
+            label = "Medians ~%s" % col_x
 
         plt.subplots(figsize=(12, 8))
         self.plot_KeKa()
@@ -2535,7 +2535,7 @@ class PlotsMetricas(object):
         plt.colorbar(xy).set_label(self.unidades[col_x], fontsize="xx-large")
         plt.scatter(x=bptx, y=bpty, color="black", s=3, label=label)
 
-        plt.title("Diagrama BPT: %s" % titulo, fontsize="xx-large")
+        plt.title("BPT diagram: %s" % titulo, fontsize="xx-large")
         plt.xlabel(r"$log_{10}$(NII / H$\alpha$)", fontsize="xx-large")
         plt.ylabel(r"$log_{10}$(OIII / H$\beta$)", fontsize="xx-large")
         plt.xticks(fontsize=16)
@@ -2583,7 +2583,7 @@ class PlotsMetricas(object):
         bpty_test = ynum - yden
 
         self.plot_bpt(
-            "Medianas estimadas pelo Operon",
+            "Operon-estimated medians",
             sintx_test,
             sinty_test,
             bptx_test,
@@ -2633,7 +2633,7 @@ class PlotsMetricas(object):
         qmax = medians["qmax"]
 
         self.plot_bpt(
-            "Medianas estimadas pelo Operon",
+            "Operon-estimated medians",
             mediansx,
             mediansy,
             bptx,
