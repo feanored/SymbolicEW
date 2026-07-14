@@ -2329,7 +2329,7 @@ class PlotsMetricas(object):
 
     def curvas_densidade(
         self, dados_x, dados_y, levels=True, cor="black", linestyle="-",
-        label="Numerical density levels",
+        label="Density levels (Samples)",
     ):
         if levels:
             X, Y, Z, lvls = self.get_levels(dados_x, dados_y)
@@ -2370,7 +2370,7 @@ class PlotsMetricas(object):
 
     def curvas_densidade_norm(
         self, dados_x, dados_y, bins=100, xlim=(-2, 1), ylim=(-1.5, 1.4),
-        cor="black", linestyle="-", label="Numerical density levels",
+        cor="black", linestyle="-", label="Density levels (Samples)",
     ):
         # Mesma densidade (grade fixa + normalização) usada em plot_kde_diff_bpt,
         # para que os contornos aqui combinem com o mapa de diferença de lá.
@@ -2652,7 +2652,7 @@ class PlotsMetricas(object):
             save=save,
         )
 
-    def gerar_amostras(self, modelos, algo, test, test_lhc=None):
+    def gerar_amostras(self, modelos, algo, test, test_lhc=None, seed=RANDOM_SEED):
         X_test = test[self.features].to_numpy(dtype=np.float64, copy=True)
         larguras = self.targets[:4]
         n_samples = len(X_test)
@@ -2760,7 +2760,7 @@ class PlotsMetricas(object):
 
         # Salvando amostras em CSV
         df_amostras = pd.DataFrame(amostras)
-        df_amostras.to_csv(f"results/amostras_all_{algo}.csv", index=False)
+        df_amostras.to_csv(f"results/amostras_all_{algo}_{seed}.csv", index=False)
 
         print("Estatísticas:")
         for nome in larguras:

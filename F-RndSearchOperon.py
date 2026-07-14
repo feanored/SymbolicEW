@@ -103,10 +103,10 @@ if __name__ == "__main__":
             TREINAR = "nunca"  # Não treinar mais modelos nas próximas iterações
  
         print("Gerando novas amostras!")
-        p.gerar_amostras(modelos, modelo, test)
+        p.gerar_amostras(modelos, modelo, test, seed=RANDOM_SEED)
         
         # Ler amostras geradas
-        df_amostras = pd.read_csv(f"results/amostras_all_{modelo}.csv")
+        df_amostras = pd.read_csv(f"results/amostras_all_{modelo}_{RANDOM_SEED}.csv")
         df_amostras = df_amostras.dropna()
         df_amostras = df_amostras.reset_index(drop=True)
         df_amostras[T.nii_ha.value] = df_amostras[T.nii.value] - df_amostras[T.ha.value]
@@ -120,14 +120,14 @@ if __name__ == "__main__":
         res_energy = energy_test_repeated(
             test[T.nii_ha.value], test[T.oiii_hb.value],
             df_amostras[T.nii_ha.value], df_amostras[T.oiii_hb.value],
-            n_max=500, n_perm=199, n_jobs=n_jobs
+            n_max=500, n_perm=199, random_state=RANDOM_SEED, n_jobs=n_jobs
         )
 
         # 2) Distância de Wasserstein (transporte de massa ótimo)
         res_wasserstein = wasserstein_test(
             test[T.nii_ha.value], test[T.oiii_hb.value],
             df_amostras[T.nii_ha.value], df_amostras[T.oiii_hb.value],
-            n_max=250, n_perm=199, n_jobs=n_jobs
+            n_max=250, n_perm=199, random_state=RANDOM_SEED, n_jobs=n_jobs
         )
         
         # 3) Diferença de densidades KDE 2D + testes KL e KS-2D
