@@ -2452,6 +2452,39 @@ class PlotsMetricas(object):
 
         return dict(kl=kl, ks=ks, diff=diff, grid=(Xg, Yg, Z1, Z2))
 
+    def plot_rndsrc_metrics(self, df, titulo="Operon"):
+        """
+        Gráficos de linha (um painel por métrica, grade 2x2) das métricas de
+        ajuste bidimensional no BPT (teste de energia, Wasserstein, KS-2D e
+        KL) calculadas para cada seed de um random search, como o lido de
+        results/rndsrc_*.csv (colunas seed, p_energy, p_wasserstein, d_ks2d,
+        d_kl), na ordem em que aparecem no arquivo.
+        """
+        metricas = [
+            ("p_energy", "royalblue", "Energy test p-value", "p-value", True),
+            ("p_wasserstein", "firebrick", "Wasserstein test p-value", "p-value", True),
+            ("d_ks2d", "seagreen", "KS-2D distance", "Distance", False),
+            ("d_kl", "darkorange", "KL divergence", "Distance", False),
+        ]
+        x = np.arange(1, len(df) + 1)
+
+        fig, axes = plt.subplots(2, 2, figsize=(10, 8))
+        fig.suptitle(f"Random search stability ({len(df)} seeds) - {titulo}", fontsize="xx-large", y=0.995)
+
+        for ax, (col, cor, label, ylabel, is_pvalue) in zip(axes.flat, metricas):
+            lbl = r"$\mu$ = %.4f, $\sigma$ = %.4f" % (df[col].mean(), df[col].std())
+            ax.plot(x, df[col], "-", color=cor, alpha=0.8, linewidth=1, label=lbl)
+            if is_pvalue:
+                ax.axhline(0.05, color="black", linestyle="--", linewidth=1, label=r"$\alpha$ = 0.05")
+            ax.set_xlabel("Trial")
+            ax.set_ylabel(ylabel)
+            ax.set_title(label)
+            ax.grid(True, alpha=0.3)
+            ax.legend(fontsize=8)
+
+        plt.tight_layout()
+        return fig, axes
+
     def bpt_pontos_reg(
         self,
         col_x,

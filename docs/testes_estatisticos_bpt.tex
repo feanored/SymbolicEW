@@ -12,7 +12,7 @@
 \geometry{margin=2.5cm}
 \hypersetup{colorlinks=true, linkcolor=blue, citecolor=blue, urlcolor=blue}
 
-\title{Hipóteses nulas dos testes estatísticos bidimensionais de energia, Wasserstein e Bhattacharyya}
+\title{Testes e métricas estatísticas bidimensionais de energia, Wasserstein, divergência KL e distância de Kolmogorov-Smirnov}
 \author{}
 \date{}
 
@@ -25,11 +25,16 @@
 Nas comparações realizadas entre a amostra observada (\texttt{test}) e a
 amostra sintética gerada pelo modelo (\texttt{df\_amostras}) no espaço
 bidimensional do diagrama BPT (\([\mathrm{N\textsc{ii}}]/\mathrm{H}\alpha\)
-vs.\ \([\mathrm{O\textsc{iii}}]/\mathrm{H}\beta\)), utilizam-se três
+vs.\ \([\mathrm{O\textsc{iii}}]/\mathrm{H}\beta\)), utilizam-se quatro
 abordagens para quantificar a similaridade entre as duas distribuições:
-o teste de energia de Székely e Rizzo, a distância de Wasserstein e o
-coeficiente de Bhattacharyya. Este documento descreve, de forma didática,
-a hipótese nula (ou a ausência dela) em cada caso.
+o teste de energia de Székely e Rizzo, a distância de Wasserstein, a
+divergência de Kullback-Leibler (KL) bidimensional e a distância de
+Kolmogorov-Smirnov (KS) bidimensional de Peacock. As duas primeiras são
+usadas como testes de hipótese formais, com p-valor obtido por
+permutação; as duas últimas são usadas apenas como \emph{distâncias}
+descritivas, um critério adicional de escolha entre modelos, sem
+p-valor associado. Este documento descreve, de forma didática, a
+hipótese nula (ou a ausência dela) em cada caso.
 
 \section{Teste de energia (Székely \& Rizzo)}
 
@@ -84,38 +89,84 @@ p-valor de permutação é calculado com a mesma lógica do teste de
 energia: embaralham-se os rótulos de grupo, recalcula-se a distância de
 Wasserstein em cada permutação, e compara-se com o valor observado.
 
-\section{Coeficiente e distância de Bhattacharyya}
+\section{Divergência de Kullback-Leibler (KL) bidimensional}
 
-\textbf{Ausência de hipótese nula formal.} Ao contrário dos dois testes
-anteriores, o coeficiente de Bhattacharyya não constitui um teste de
-hipótese estatística com p-valor associado \cite{bhattacharyya1943,kailath1967}.
-Trata-se de uma medida descritiva de \emph{sobreposição} entre duas
-densidades de probabilidade estimadas via KDE (\textit{kernel density
-estimation}) bidimensional, sem uma distribuição nula ou procedimento de
+\textbf{Ausência de hipótese nula formal.} Assim como a distância de
+Wasserstein sem permutação, a divergência de Kullback-Leibler não
+constitui, por si só, um teste de hipótese com p-valor associado
+\cite{kullback1951}. Trata-se de uma medida descritiva e
+\emph{assimétrica} de dissimilaridade entre duas distribuições de
+probabilidade conjuntas, estimadas no plano BPT por histogramas
+bidimensionais (e não por KDE), sem distribuição nula ou procedimento de
 permutação subjacente.
 
-\textbf{Definição.} Dadas duas densidades estimadas $p(x,y)$ e $q(x,y)$
-no plano BPT, o coeficiente de Bhattacharyya é definido como
+\textbf{Definição.} Dadas as amostras \texttt{test} ($P$, referência
+observada) e \texttt{amostras} ($Q$, modelo) no plano BPT, ambas as
+densidades são estimadas em uma grade comum de histogramas 2D com o
+mesmo número de \textit{bins} nas duas dimensões, normalizados para
+somarem $1$. A divergência é então
 \[
-BC = \int\!\!\int \sqrt{p(x,y)\, q(x,y)}\; dx\, dy,
+D_{\mathrm{KL}}(P \parallel Q) = \sum_{i,j} p_{ij} \,
+\ln\!\left(\frac{p_{ij}}{q_{ij}}\right),
 \]
-e a distância correspondente é
-\[
-D_B = -\ln(BC).
-\]
+onde $p_{ij}$ e $q_{ij}$ são as massas de probabilidade normalizadas de
+cada \textit{bin} $(i,j)$ da grade compartilhada. Para evitar divisões por
+zero e $\ln(0)$ em \textit{bins} vazios, uma constante pequena $\epsilon$
+é somada a $p_{ij}$ e $q_{ij}$ antes da normalização.
 
 \textbf{Interpretação.}
 \begin{itemize}
-  \item $BC = 1$ ($D_B = 0$): sobreposição total entre as densidades.
-  \item $BC = 0$ ($D_B \to \infty$): nenhuma sobreposição entre as densidades.
+  \item $D_{\mathrm{KL}} = 0$: as duas distribuições coincidem em todos
+  os \textit{bins} da grade utilizada.
+  \item $D_{\mathrm{KL}} > 0$, sem limite superior: quanto maior o valor,
+  maior a dissimilaridade; a divergência penaliza fortemente
+  \textit{bins} onde $P$ tem massa considerável e $Q$ tem massa próxima
+  de zero (e vice-versa), refletindo o quanto de informação se perde ao
+  aproximar $P$ por $Q$ \cite{kullback1951}.
+  \item Ao contrário do teste de energia, de Wasserstein e do KS-2D, a
+  medida \textbf{não é simétrica}: $D_{\mathrm{KL}}(P\parallel Q) \neq
+  D_{\mathrm{KL}}(Q\parallel P)$ em geral, pois penaliza de forma
+  diferente a falta de cobertura de $Q$ sobre $P$ e vice-versa.
 \end{itemize}
 
-Assim, o coeficiente de Bhattacharyya responde à pergunta ``o quanto as
-duas densidades se sobrepõem?'', enquanto os testes de energia e de
-Wasserstein respondem, respectivamente, a ``as duas amostras podem ser
-consideradas estatisticamente indistinguíveis?'' e ``qual o custo de
-transporte entre as duas distribuições, e esse custo é maior do que o
-esperado ao acaso?''.
+\section{Distância de Kolmogorov-Smirnov bidimensional (KS-2D)}
+
+\textbf{Ausência de p-valor nesta aplicação.} A estatística $D$ do
+KS-2D admite, em princípio, um teste de hipótese análogo ao do teste de
+energia e da distância de Wasserstein, com $H_0: F_{\text{test}} =
+F_{\text{amostras}}$ e p-valor obtido por permutação. Neste trabalho,
+porém, apenas o valor de $D$ é utilizado, como uma medida descritiva de
+dissimilaridade \emph{espacial} entre as duas nuvens de pontos, sem
+p-valor associado: um critério adicional de escolha entre modelos,
+complementar ao teste de energia e à distância de Wasserstein.
+
+\textbf{Definição.} A generalização do teste de KS unidimensional para
+duas dimensões não admite uma única função de distribuição acumulada
+ordenada, de modo que a estatística é construída de forma diferente,
+seguindo a abordagem de Peacock \cite{peacock1983} e de Fasano \&
+Franceschini \cite{fasano1987}: para cada ponto de referência da amostra
+combinada (\texttt{test} $\cup$ \texttt{amostras}), o plano é dividido em
+quatro quadrantes a partir desse ponto, e calcula-se a fração de pontos
+de cada uma das duas amostras que cai em cada quadrante. A estatística
+$D$ é o maior desvio absoluto observado entre essas frações, considerando
+todos os quadrantes e todos os pontos de referência:
+\[
+D = \max_{i,\, q \in \{1,2,3,4\}} \left|
+F^{\text{test}}_q(x_i, y_i) - F^{\text{amostras}}_q(x_i, y_i)
+\right|,
+\]
+onde $F^{\text{test}}_q(x_i, y_i)$ e $F^{\text{amostras}}_q(x_i, y_i)$ são
+as frações de pontos de cada amostra no quadrante $q$ definido pelo ponto
+de referência $(x_i, y_i)$.
+
+\textbf{Interpretação.} $D = 0$ indica distribuições espacialmente
+indistinguíveis nos pontos de referência amostrados; quanto maior $D$,
+maior a diferença de forma espacial entre as duas nuvens. Diferentemente
+do teste de energia e da distância de Wasserstein, o KS-2D é sensível
+sobretudo à \emph{forma} espacial da distribuição conjunta, e não
+apenas à distância entre nuvens de pontos. Por ter custo computacional
+$O(n^2)$ por avaliação, amostras grandes são sub-amostradas antes do
+cálculo de $D$.
 
 \section{Resumo comparativo}
 
@@ -123,14 +174,15 @@ esperado ao acaso?''.
 \centering
 \begin{tabular}{@{}p{2.7cm}p{5.5cm}p{3cm}p{2.2cm}@{}}
 \toprule
-\textbf{Método} & \textbf{Pergunta respondida} & \textbf{Tem p-valor?} & \textbf{Referência} \\
+\textbf{Método} & \textbf{Pergunta respondida} & \textbf{P-valor usado?} & \textbf{Referência} \\
 \midrule
 Teste de energia & As nuvens de pontos são estatisticamente indistinguíveis? & Sim (permutação) & \cite{szekely2004,szekely2013} \\
 Wasserstein & Qual o custo de deslocamento de massa entre as distribuições, e é maior que o esperado ao acaso? & Sim (permutação) & \cite{villani2009,kantorovich1942} \\
-Bhattacharyya & Quanto as densidades (KDE) se sobrepõem? & Não (medida descritiva) & \cite{bhattacharyya1943} \\
+KL (2D) & Quanta informação se perde ao aproximar a distribuição observada pela do modelo (histogramas 2D)? & Não (medida descritiva, assimétrica) & \cite{kullback1951} \\
+KS-2D (Peacock) & Qual a maior diferença de forma espacial, quadrante a quadrante? & Não (só distância $D$) & \cite{peacock1983,fasano1987} \\
 \bottomrule
 \end{tabular}
-\caption{Comparação entre os três métodos de comparação de distribuições
+\caption{Comparação entre os quatro métodos de comparação de distribuições
 bidimensionais no diagrama BPT.}
 \end{table}
 
@@ -166,18 +218,23 @@ Rubner, Y., Tomasi, C., \& Guibas, L.\ J.\ (2000).
 International Journal of Computer Vision, 40(2), 99--121.
 \url{https://doi.org/10.1023/A:1026543900054}
 
-\bibitem{bhattacharyya1943}
-Bhattacharyya, A.\ (1943).
-\emph{On a measure of divergence between two statistical populations
-defined by their probability distributions.}
-Bulletin of the Calcutta Mathematical Society, 35, 99--109.
+\bibitem{kullback1951}
+Kullback, S., \& Leibler, R.\ A.\ (1951).
+\emph{On information and sufficiency.}
+Annals of Mathematical Statistics, 22(1), 79--86.
+\url{https://doi.org/10.1214/aoms/1177729694}
 
-\bibitem{kailath1967}
-Kailath, T.\ (1967).
-\emph{The divergence and Bhattacharyya distance measures in signal
-selection.}
-IEEE Transactions on Communication Technology, 15(1), 52--60.
-\url{https://doi.org/10.1109/TCOM.1967.1089532}
+\bibitem{peacock1983}
+Peacock, J.\ A.\ (1983).
+\emph{Two-dimensional goodness-of-fit testing in astronomy.}
+Monthly Notices of the Royal Astronomical Society, 202(3), 615--627.
+\url{https://doi.org/10.1093/mnras/202.3.615}
+
+\bibitem{fasano1987}
+Fasano, G., \& Franceschini, A.\ (1987).
+\emph{A multidimensional version of the Kolmogorov-Smirnov test.}
+Monthly Notices of the Royal Astronomical Society, 225(1), 155--170.
+\url{https://doi.org/10.1093/mnras/225.1.155}
 
 \end{thebibliography}
 
