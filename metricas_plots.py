@@ -15,9 +15,6 @@ except NameError:
     matplotlib.use('Agg')  # headless (plain script) execution
 import smplotlib # type: ignore
 import matplotlib.pyplot as plt
-import plotly.graph_objects as go
-import plotly.express as px
-import plotly.io as pio
 from scipy import stats
 import scipy.linalg as la
 from scipy.special import gammaln
@@ -464,7 +461,6 @@ class PlotsMetricas(object):
         np.random.seed(RANDOM_SEED)
         self.unidades = {}
         self.setUnidades()
-        self.setOptions()
 
     def __str__(self):
         return self.targets
@@ -481,9 +477,7 @@ class PlotsMetricas(object):
         self.unidades[F.mass.value] = r"$ \log (mass/M_\odot) $"
 
     def setOptions(self):
-        # if platform.system() == "Windows":
-        #    pio.renderers.default = 'browser'
-        # else:
+        import plotly.io as pio
         pio.renderers.default = "png"
         pio.templates["plotly"].layout.width = 900
         pio.templates["plotly"].layout.height = 600
@@ -1667,6 +1661,9 @@ class PlotsMetricas(object):
         plt.show()
 
     def plotly_entropy(self, df, loss="loss"):
+        import plotly.graph_objects as go
+        import plotly.express as px
+        self.setOptions()
         fig = px.scatter(df, x="complexity", y=loss, title="Pareto Front")
         fig.update_xaxes(tickvals=df["complexity"])
         # Calcular a inclinação para cada par de pontos consecutivos
