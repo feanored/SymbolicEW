@@ -1449,7 +1449,7 @@ class PlotsMetricas(object):
         q_counts, _ = np.histogram(amostras[col2], bins=bins)
         p = p_counts / p_counts.sum() + eps
         q = q_counts / q_counts.sum() + eps
-        kl = np.sum(p * np.log(p / q))
+        kl = np.sum(np.abs(p * np.log(p / q)))
         return kl
 
     def filtra_median(self, df_median, filtro):
@@ -2449,7 +2449,7 @@ class PlotsMetricas(object):
 
         return dict(kl=kl, ks=ks, diff=diff, grid=(Xg, Yg, Z1, Z2))
 
-    def plot_rndsrc_metrics(self, df, titulo="Operon"):
+    def plot_rndsrc_metrics(self, df, titulo=" - Operon"):
         """
         Gráficos de linha (um painel por métrica, grade 2x2) das métricas de
         ajuste bidimensional no BPT (teste de energia, Wasserstein, KS-2D e
@@ -2466,7 +2466,7 @@ class PlotsMetricas(object):
         x = np.arange(1, len(df) + 1)
 
         fig, axes = plt.subplots(2, 2, figsize=(10, 8))
-        fig.suptitle(f"Random search stability ({len(df)} seeds) - {titulo}", fontsize="xx-large", y=0.995)
+        fig.suptitle(f"Random search stability ({len(df)} seeds){titulo}", fontsize="xx-large", y=0.995)
 
         for ax, (col, cor, label, ylabel, is_pvalue) in zip(axes.flat, metricas):
             lbl = r"$\mu$ = %.4f, $\sigma$ = %.4f" % (df[col].mean(), df[col].std())
