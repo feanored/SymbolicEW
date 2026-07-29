@@ -1449,8 +1449,27 @@ class PlotsMetricas(object):
         q_counts, _ = np.histogram(amostras[col2], bins=bins)
         p = p_counts / p_counts.sum() + eps
         q = q_counts / q_counts.sum() + eps
-        kl = np.sum(np.abs(p * np.log(p / q)))
+        kl = np.sum(p * np.log(p / q))
         return kl
+
+    def calcula_ks_d(self, reais, amostras, col1, bins, col2=None):
+        if col2 is None:
+            col2 = col1
+        p_counts, _ = np.histogram(reais[col1], bins=bins)
+        q_counts, _ = np.histogram(amostras[col2], bins=bins)
+        p_cdf = np.cumsum(p_counts) / p_counts.sum()
+        q_cdf = np.cumsum(q_counts) / q_counts.sum()
+        ks = np.max(np.abs(p_cdf - q_cdf))
+        return ks
+
+    def calcula_chi2(self, reais, amostras, col1, bins, col2=None):
+        if col2 is None:
+            col2 = col1
+        p_counts, _ = np.histogram(reais[col1], bins=bins)
+        q_counts, _ = np.histogram(amostras[col2], bins=bins)
+        mask = p_counts > 0
+        chi2 = np.mean(np.pow(q_counts[mask] - p_counts[mask], 2) / p_counts[mask])
+        return chi2
 
     def filtra_median(self, df_median, filtro):
         df_median = df_median[
