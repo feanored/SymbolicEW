@@ -2121,7 +2121,7 @@ class PlotsMetricas(object):
             save=save,
         )
 
-    def gerar_amostras(self, modelos, algo, test, test_lhc):
+    def gerar_amostras(self, modelos, algo, test):
         X_test = test[self.features].to_numpy(dtype=np.float64, copy=True)
         larguras = self.targets[:4]
         n_samples = len(X_test)
@@ -2132,14 +2132,9 @@ class PlotsMetricas(object):
         means_all = np.column_stack(
             [modelos[f"{nome}_mean"].predict(X_test) for nome in larguras]
         )
-        if algo == "operon":
-            stds_all = np.column_stack(
-                [np.full(n_samples, test_lhc[f"{nome}_std"].mean()) for nome in larguras]
-            )
-        else:
-            stds_all = np.column_stack(
-                [np.maximum(modelos[f"{nome}_std"].predict(X_test), 1e-6) for nome in larguras]
-            )
+        stds_all = np.column_stack(
+            [np.maximum(modelos[f"{nome}_std"].predict(X_test), 1e-6) for nome in larguras]
+        )
         covs_all = {}
         for l1, l2 in self.cov_pairs:
             covs_all[(l1, l2)] = modelos[f"cov_{l1}_{l2}"].predict(X_test)
