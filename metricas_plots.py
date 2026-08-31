@@ -2240,7 +2240,7 @@ class PlotsMetricas(object):
         if graus_liberdade <= 2:
             raise ValueError("graus_liberdade deve ser > 2 para a covariância ser finita")
         # Cov(t-Student) = shape * df/(df-2)
-        shape = 1#(graus_liberdade - 2) / graus_liberdade
+        shape = (graus_liberdade - 2) / graus_liberdade
 
         X_test = test[self.features].to_numpy(dtype=np.float64, copy=True)
         larguras = self.targets[:4]
@@ -2427,6 +2427,70 @@ class PlotsMetricas(object):
             available = np.delete(available, best_local)
 
         return pd.DataFrame(records)
+
+    def divergenciakl(self, df_amostras, test, models):
+        # Calcula divergência KL entre amostras e o conjunto observado
+        bins = np.linspace(-1, 2.5, 100)
+        targets = [T.nii, T.ha, T.oiii, T.hb]
+        kl_values = [self.calcula_kl(test, df_amostras, t.value, bins) for t in targets]
+        print(kl_values)
+
+        # Gráficos
+        fig, axs = plt.subplots(2, 2, figsize=(16, 12))
+        # plt.suptitle("Distribuição das amostras normais geradas em função das 6 features", fontsize="xx-large")
+
+        for i, (t, kl) in enumerate(zip(targets, kl_values)):
+            ax = axs[i // 2][i % 2]
+            self.histogram_v(
+                test[t.value], "", ax, bins=bins, lim=(-1, 2.5), cor="darkblue", lbl="Validation Set"
+            )
+            self.histogram_v(
+                df_amostras[t.value],
+                r"%s, $D_{KL}$ = %.4f" % (self.unidades[t.value], kl),
+                ax,
+                bins=bins,
+                lim=(-1, 2.5),
+                cor="red",
+                lbl="Sampled Set",
+            )
+
+        plt.tight_layout()
+        plt.savefig(f"results/histogramas/marginais_amostras_{models['MS']}_all_{models['SR']}.png", bbox_inches="tight")
+
+    def correlacoes(self, df_amostras, test, larguras, models):
+        # Matriz de correlação das amostras geradas
+        corr_gerada = stats.spearmanr(df_amostras[larguras]).correlation
+        df_corrger = pd.DataFrame(corr_gerada, index=larguras, columns=larguras)
+
+        # Matriz de correlação dos dados reais (test set)
+        test_linhas = test[larguras].values
+        corr_real = stats.spearmanr(test_linhas).correlation
+        df_corrtest = pd.DataFrame(corr_real, index=larguras, columns=larguras)
+
+        # Diferença total absoluta
+        diff_df = (df_corrger - df_corrtest).abs()
+        diff = diff_df.values[np.triu_indices(4, k=1)].sum()
+
+        fig, axes = plt.subplots(1, 2, figsize=(16, 6))
+        self.plot_corr(
+            corr_real,
+            axes[0],
+            larguras,
+            title="Matriz de correlação dos dados de teste",
+            type="inf",
+        )
+        self.plot_corr(
+            corr_gerada,
+            axes[1],
+            larguras,
+            title="Matriz de correlação das amostras normais,\n"
+            + r"com $\Delta$=%.4f" % (diff),
+            type="inf",
+        )
+        plt.savefig(
+            f"results/correlacoes/corr_amostras_{models['MS']}_all_{models['SR']}.png", bbox_inches="tight"
+        )
+        plt.close()
 
     def bpt_amostras_normais(self, dados, amostras):
         X_ = []
